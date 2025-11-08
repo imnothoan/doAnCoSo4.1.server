@@ -2,8 +2,6 @@ const express = require("express");
 const multer = require("multer");
 const router = express.Router();
 const { supabase } = require("../db/supabaseClient");
-
-// Multer for in-memory uploads (avatar)
 const upload = multer({ storage: multer.memoryStorage() });
 
 /* ---------------------------------- Helpers ---------------------------------- */
