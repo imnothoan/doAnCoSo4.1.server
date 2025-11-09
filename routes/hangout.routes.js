@@ -30,6 +30,46 @@ async function getHangoutById(hangoutId) {
 
 // ... các import và code khác phía trên
 
+/**
+ * Update user hangout status
+ * PUT /hangouts/status
+ * Body: { username, is_available, current_activity?, activities? }
+ */
+router.put("/status", async (req, res) => {
+  const { username, is_available, current_activity, activities } = req.body;
+
+  if (!username) {
+    return res.status(400).json({ message: "Missing username." });
+  }
+
+  try {
+    const updates = {
+      username,
+      is_available: !!is_available,
+    };
+
+    if (current_activity !== undefined) {
+      updates.current_activity = current_activity;
+    }
+    if (activities !== undefined) {
+      updates.activities = Array.isArray(activities) ? activities : [];
+    }
+
+    const { data, error } = await supabase
+      .from("user_hangout_status")
+      .upsert([updates])
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    console.error("update hangout status error:", err);
+    res.status(500).json({ message: "Server error while updating hangout status." });
+  }
+});
+
 // GET /hangouts/status/:username
 router.get("/status/:username", async (req, res) => {
   const { username } = req.params;
