@@ -44,7 +44,9 @@ const hangoutRoutes = require("./routes/hangout.routes");
 const communityRoutes = require("./routes/community.routes");
 const notificationRoutes = require("./routes/notification.routes");
 const quickMessageRoutes = require("./routes/quickMessage.routes");
+const authRoutes = require("./routes/auth.routes");
 
+app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/posts", postRoutes);
 app.use("/messages", messageRoutes);
@@ -74,3 +76,4 @@ app.use((err, _req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server listening on port ${PORT}`);
 });
+
