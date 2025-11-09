@@ -260,9 +260,13 @@ router.put("/:id", async (req, res) => {
  */
 router.get("/", async (req, res) => {
   const limit = Math.min(Number(req.query.limit || 20), 100);
-  const gender = req.query.gender;
+  const genderParam = req.query.gender;
   const minAge = req.query.min_age ? Number(req.query.min_age) : null;
   const maxAge = req.query.max_age ? Number(req.query.max_age) : null;
+
+  // Validate gender parameter (only allow specific values)
+  const validGenders = ["Male", "Female", "Other"];
+  const gender = genderParam && validGenders.includes(genderParam) ? genderParam : null;
 
   try {
     let query = supabase
