@@ -63,34 +63,6 @@ router.get("/status/:username", async (req, res) => {
   }
 });
 
-/**
- * Get user hangout status
- * GET /hangouts/status/:username
- */
-router.get("/status/:username", async (req, res) => {
-  const { username } = req.params;
-
-  try {
-    const { data, error } = await supabase
-      .from("user_hangout_status")
-      .select("*")
-      .eq("username", username)
-      .single();
-
-    if (error) {
-      if (String(error.message).includes("0 rows")) {
-        return res.json({ username, is_available: false, activities: [] });
-      }
-      throw error;
-    }
-
-    res.json(data);
-  } catch (err) {
-    console.error("get hangout status error:", err);
-    res.status(500).json({ message: "Server error while fetching hangout status." });
-  }
-});
-
 /* ------------------------------- Hangout CRUD ------------------------------ */
 
 /**
