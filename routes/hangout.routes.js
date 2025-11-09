@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { supabase } = require("../db/supabaseClient");
 
-/* --------------------------------- Helpers --------------------------------- */
+/*Helpers  */
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Earth's radius in km
@@ -28,35 +28,38 @@ async function getHangoutById(hangoutId) {
   return data || null;
 }
 
-/* --------------------------- User Hangout Status --------------------------- */
+// ... các import và code khác phía trên
 
-/**
- * Update user hangout availability status
- * PUT /hangouts/status
- * Body: { username, is_available, current_activity?, activities?: string[] }
- */
-router.put("/status", async (req, res) => {
-  const { username, is_available, current_activity, activities } = req.body;
-
-  if (!username) return res.status(400).json({ message: "Missing username." });
+// GET /hangouts/status/:username
+router.get("/status/:username", async (req, res) => {
+  const { username } = req.params;
 
   try {
-    const updates = { username, is_available };
-    if (current_activity !== undefined) updates.current_activity = current_activity;
-    if (activities !== undefined) updates.activities = activities;
-    updates.last_updated = new Date().toISOString();
-
     const { data, error } = await supabase
       .from("user_hangout_status")
-      .upsert([updates])
       .select("*")
-      .single();
+      .eq("username", username)
+      .maybeSingle();                
 
-    if (error) throw error;
+    if (error) {
+      console.error("[DEBUG] hangout status supabase error:", error);
+      throw error;
+    }
+
+    if (!data) {
+      // Fallback khi chưa có status
+      return res.json({
+        username,
+        is_available: false,
+        current_activity: "",
+        activities: [],
+      });
+    }
+
     res.json(data);
   } catch (err) {
-    console.error("update hangout status error:", err);
-    res.status(500).json({ message: "Server error while updating hangout status." });
+    console.error("get hangout status error:", err);
+    res.status(500).json({ message: "Server error while fetching hangout status." });
   }
 });
 
