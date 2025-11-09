@@ -407,6 +407,46 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Function to increment community member count
+CREATE OR REPLACE FUNCTION increment_community_members(community_id BIGINT)
+RETURNS void AS $$
+BEGIN
+  UPDATE communities 
+  SET member_count = member_count + 1 
+  WHERE id = community_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to decrement community member count
+CREATE OR REPLACE FUNCTION decrement_community_members(community_id BIGINT)
+RETURNS void AS $$
+BEGIN
+  UPDATE communities 
+  SET member_count = GREATEST(member_count - 1, 0)
+  WHERE id = community_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to increment community post count
+CREATE OR REPLACE FUNCTION increment_community_posts(community_id BIGINT)
+RETURNS void AS $$
+BEGIN
+  UPDATE communities 
+  SET post_count = post_count + 1 
+  WHERE id = community_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to decrement community post count
+CREATE OR REPLACE FUNCTION decrement_community_posts(community_id BIGINT)
+RETURNS void AS $$
+BEGIN
+  UPDATE communities 
+  SET post_count = GREATEST(post_count - 1, 0)
+  WHERE id = community_id;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Trigger to update timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
