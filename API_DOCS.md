@@ -640,6 +640,136 @@ Content-Type: application/json
 
 ---
 
+## WebSocket Real-Time Events
+
+The server supports real-time features via WebSocket (Socket.IO) for instant messaging, typing indicators, and user presence.
+
+### Connection
+
+```javascript
+import io from 'socket.io-client';
+
+const socket = io('http://localhost:3000', {
+  auth: {
+    token: '<user-auth-token>' // base64 encoded userId:timestamp
+  },
+  transports: ['websocket']
+});
+```
+
+### Events to Emit (Client → Server)
+
+#### join_conversation
+Join a conversation room to receive real-time messages.
+```javascript
+socket.emit('join_conversation', {
+  conversationId: '123'
+});
+```
+
+#### leave_conversation
+Leave a conversation room.
+```javascript
+socket.emit('leave_conversation', {
+  conversationId: '123'
+});
+```
+
+#### send_message
+Send a message in real-time.
+```javascript
+socket.emit('send_message', {
+  conversationId: '123',
+  senderUsername: 'johndoe',
+  content: 'Hello!',
+  replyToMessageId: null // optional
+});
+```
+
+#### typing
+Notify others that you are typing.
+```javascript
+socket.emit('typing', {
+  conversationId: '123',
+  username: 'johndoe',
+  isTyping: true // or false when stopped
+});
+```
+
+#### mark_read
+Mark messages as read up to a certain message ID.
+```javascript
+socket.emit('mark_read', {
+  conversationId: '123',
+  username: 'johndoe',
+  upToMessageId: 456
+});
+```
+
+### Events to Listen (Server → Client)
+
+#### new_message
+Receive a new message in a conversation you've joined.
+```javascript
+socket.on('new_message', (message) => {
+  console.log('New message:', message);
+  // message: { id, conversation_id, sender_username, content, created_at, ... }
+});
+```
+
+#### typing
+Receive typing indicator from other users.
+```javascript
+socket.on('typing', (data) => {
+  console.log(`${data.username} is typing:`, data.isTyping);
+  // data: { conversationId, username, isTyping }
+});
+```
+
+#### messages_read
+Notified when someone reads messages.
+```javascript
+socket.on('messages_read', (data) => {
+  console.log(`${data.username} read up to message ${data.upToMessageId}`);
+  // data: { conversationId, username, upToMessageId }
+});
+```
+
+#### user_status
+Receive online/offline status updates.
+```javascript
+socket.on('user_status', (data) => {
+  console.log(`${data.username} is ${data.isOnline ? 'online' : 'offline'}`);
+  // data: { username, isOnline }
+});
+```
+
+#### error
+Receive error messages.
+```javascript
+socket.on('error', (error) => {
+  console.error('WebSocket error:', error.message);
+});
+```
+
+### Connection Events
+
+```javascript
+socket.on('connect', () => {
+  console.log('Connected to WebSocket');
+});
+
+socket.on('disconnect', (reason) => {
+  console.log('Disconnected:', reason);
+});
+
+socket.on('connect_error', (error) => {
+  console.error('Connection error:', error);
+});
+```
+
+---
+
 ## Error Responses
 
 All error responses follow this format:
@@ -691,3 +821,5 @@ Distance is calculated using the Haversine formula and returned in the response.
 3. Arrays in JSON should be properly formatted
 4. Empty arrays are valid for optional array fields
 5. Null values are allowed for optional fields
+6. WebSocket connection auto-updates user online status
+7. Messages sent via WebSocket are also saved to database for persistence
