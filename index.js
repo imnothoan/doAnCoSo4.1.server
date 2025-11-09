@@ -38,9 +38,21 @@ app.get("/health", (_req, res) => {
 // Routes
 const userRoutes = require("./routes/user.routes");
 const postRoutes = require("./routes/post.routes");
+const messageRoutes = require("./routes/message.routes");
+const eventRoutes = require("./routes/event.routes");
+const hangoutRoutes = require("./routes/hangout.routes");
+const communityRoutes = require("./routes/community.routes");
+const notificationRoutes = require("./routes/notification.routes");
+const quickMessageRoutes = require("./routes/quickMessage.routes");
 
 app.use("/users", userRoutes);
 app.use("/posts", postRoutes);
+app.use("/messages", messageRoutes);
+app.use("/events", eventRoutes);
+app.use("/hangouts", hangoutRoutes);
+app.use("/communities", communityRoutes);
+app.use("/notifications", notificationRoutes);
+app.use("/quick-messages", quickMessageRoutes);
 
 // Root route
 app.get("/", (_req, res) => {
