@@ -121,6 +121,17 @@ Content-Type: application/json
 }
 ```
 
+### Check Follow Status
+
+```http
+GET /users/:username/following/:followerUsername
+
+Response:
+{
+  "isFollowing": true
+}
+```
+
 ### User Languages
 
 ```http
