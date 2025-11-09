@@ -326,6 +326,32 @@ router.post("/:id/participate", async (req, res) => {
 });
 
 /**
+ * Leave an event (alias for DELETE /events/:id/participate)
+ * DELETE /events/:id/leave
+ * Body: { username }
+ */
+router.delete("/:id/leave", async (req, res) => {
+  const eventId = Number(req.params.id);
+  const { username } = req.body;
+
+  if (!username) return res.status(400).json({ message: "Missing username." });
+
+  try {
+    const { error } = await supabase
+      .from("event_participants")
+      .delete()
+      .eq("event_id", eventId)
+      .eq("username", username);
+
+    if (error) throw error;
+    res.json({ message: "Left event." });
+  } catch (err) {
+    console.error("leave event error:", err);
+    res.status(500).json({ message: "Server error while leaving event." });
+  }
+});
+
+/**
  * Leave an event
  * DELETE /events/:id/participate
  * Body: { username }
@@ -657,6 +683,33 @@ router.get("/user/:username/participating", async (req, res) => {
   } catch (err) {
     console.error("get user participating events error:", err);
     res.status(500).json({ message: "Server error while fetching participating events." });
+  }
+});
+
+/**
+ * Search events by name
+ * GET /events/search?q=keyword
+ */
+router.get("/search", async (req, res) => {
+  const q = (req.query.q || "").trim();
+  if (!q) return res.json([]);
+
+  const limit = Math.min(Number(req.query.limit || 20), 100);
+
+  try {
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .or(`name.ilike.%${q}%,description.ilike.%${q}%`)
+      .eq("status", "upcoming")
+      .order("date_start", { ascending: true })
+      .limit(limit);
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    console.error("search events error:", err);
+    res.status(500).json({ message: "Server error while searching events." });
   }
 });
 

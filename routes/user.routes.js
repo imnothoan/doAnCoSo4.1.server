@@ -334,6 +334,30 @@ router.get("/check-username", async (req, res) => {
   }
 });
 
+/**
+ * Get user by ID (UUID format) - client-preferred endpoint
+ * GET /users/:id
+ * This must come before /:username routes to properly match UUIDs
+ */
+router.get("/:id([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const user = await getUserById(id);
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    const [followers, following, posts] = await Promise.all([
+      countFollowers(user.username),
+      countFollowing(user.username),
+      countPosts(user.username),
+    ]);
+
+    res.json({ ...user, followers, following, posts });
+  } catch (err) {
+    console.error("get by id error:", err);
+    res.status(500).json({ message: "Server error while fetching profile." });
+  }
+});
+
 /* ------------------------------- Follow System ------------------------------- */
 
 /**
