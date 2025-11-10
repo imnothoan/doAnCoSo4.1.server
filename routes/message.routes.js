@@ -238,11 +238,38 @@ router.get("/conversations", async (req, res) => {
 
     const unreadByConv = new Map((overview || []).map((o) => [o.conversation_id, o.unread_count || 0]));
 
+    // For DM conversations, get the other participant's info
+    const dmConvs = (convs || []).filter((c) => c.type === "dm");
+    const otherParticipants = new Map();
+    
+    for (const conv of dmConvs) {
+      const { data: members, error: memErr } = await supabase
+        .from("conversation_members")
+        .select("username")
+        .eq("conversation_id", conv.id);
+      
+      if (!memErr && members && members.length === 2) {
+        const otherUsername = members.find((m) => m.username !== viewer)?.username;
+        if (otherUsername) {
+          const { data: otherUser, error: userErr } = await supabase
+            .from("users")
+            .select("id, username, name, avatar")
+            .eq("username", otherUsername)
+            .single();
+          
+          if (!userErr && otherUser) {
+            otherParticipants.set(conv.id, otherUser);
+          }
+        }
+      }
+    }
+
     const enriched = (convs || [])
       .map((c) => ({
         ...c,
         last_message: lastByConv.get(c.id) || null,
         unread_count: unreadByConv.get(c.id) || 0,
+        other_participant: c.type === "dm" ? otherParticipants.get(c.id) || null : null,
       }))
       .sort((a, b) => {
         const ta = a.last_message ? new Date(a.last_message.created_at).getTime() : 0;
