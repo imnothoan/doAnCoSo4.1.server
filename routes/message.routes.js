@@ -18,6 +18,7 @@ async function ensureUserExists(username) {
 }
 
 async function getConversationById(conversationId) {
+  // Lấy conversation + members cơ bản (không join users để tránh nặng)
   const { data, error } = await supabase
     .from("conversations")
     .select(
@@ -159,16 +160,23 @@ router.get("/conversations", async (req, res) => {
       .in("id", convIds);
     if (cErr) throw cErr;
 
-    // Fetch last messages for those conversations
+    // Fetch last messages for those conversations, DISAMBIGUATE users join
     const convIdSet = new Set(convIds);
     const { data: lastMsgs, error: lErr } = await supabase
       .from("messages")
-      .select(
-        "id, conversation_id, sender_username, message_type, content, created_at, message_media(id, media_url, media_type, position)"
-      )
+      .select(`
+        id,
+        conversation_id,
+        sender_username,
+        message_type,
+        content,
+        created_at,
+        message_media(id, media_url, media_type, position),
+        sender:users!messages_sender_username_fkey(id, username, name, avatar)
+      `)
       .in("conversation_id", Array.from(convIdSet))
       .order("created_at", { ascending: false })
-      .limit(1000); // heuristic: get plenty, we will pick 1 per conv
+      .limit(1000); // heuristic: get plenty, pick 1 per conv
     if (lErr) throw lErr;
 
     const lastByConv = new Map();
@@ -184,7 +192,6 @@ router.get("/conversations", async (req, res) => {
         last_message: lastByConv.get(c.id) || null,
         unread_count: unreadByConv.get(c.id) || 0,
       }))
-      // sort by last message time desc
       .sort((a, b) => {
         const ta = a.last_message ? new Date(a.last_message.created_at).getTime() : 0;
         const tb = b.last_message ? new Date(b.last_message.created_at).getTime() : 0;
@@ -295,9 +302,18 @@ router.get("/conversations/:id/messages", async (req, res) => {
   try {
     let query = supabase
       .from("messages")
-      .select(
-        "id, conversation_id, sender_username, message_type, content, reply_to_message_id, created_at, updated_at, message_media(id, media_url, media_type, position)"
-      )
+      .select(`
+        id,
+        conversation_id,
+        sender_username,
+        message_type,
+        content,
+        reply_to_message_id,
+        created_at,
+        updated_at,
+        message_media(id, media_url, media_type, position),
+        sender:users!messages_sender_username_fkey(id, username, name, avatar)
+      `)
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: false })
       .limit(limit);
@@ -482,8 +498,6 @@ router.post(
  * Delete a message (author only)
  * DELETE /messages/conversations/:id/messages/:messageId
  * Body: { actor }
- * Note: This deletes DB rows. If you also want to delete Storage objects,
- *       store storage_path for each attachment and call storage.remove([...]).
  */
 router.delete("/conversations/:id/messages/:messageId", async (req, res) => {
   const conversationId = Number(req.params.id);
@@ -498,13 +512,6 @@ router.delete("/conversations/:id/messages/:messageId", async (req, res) => {
       return res.status(404).json({ message: "Message not found." });
     if (msg.sender_username !== actor)
       return res.status(403).json({ message: "Only author can delete this message." });
-
-    // (Optional) delete Storage items by parsing media_url into storage path
-    // const attachments = msg.message_media || [];
-    // for (const a of attachments) {
-    //   const sp = storagePathFromPublicUrl(a.media_url, MSG_BUCKET);
-    //   if (sp) await supabase.storage.from(MSG_BUCKET).remove([sp]);
-    // }
 
     const delMedia = await supabase.from("message_media").delete().eq("message_id", messageId);
     if (delMedia.error) throw delMedia.error;
@@ -525,7 +532,6 @@ router.delete("/conversations/:id/messages/:messageId", async (req, res) => {
  * Mark messages as read up to a point
  * POST /messages/conversations/:id/read
  * Body: { username, up_to_message_id? }
- * If up_to_message_id omitted, marks all existing messages as read.
  */
 router.post("/conversations/:id/read", async (req, res) => {
   const conversationId = Number(req.params.id);
@@ -553,7 +559,6 @@ router.post("/conversations/:id/read", async (req, res) => {
 
     const toMark = (ids || []).map((r) => ({ message_id: r.id, username }));
     if (toMark.length) {
-      // Upsert read receipts (PK: message_id, username)
       const up = await supabase.from("message_reads").upsert(toMark);
       if (up.error) throw up.error;
     }
