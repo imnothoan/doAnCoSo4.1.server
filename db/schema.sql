@@ -474,6 +474,51 @@ CREATE TRIGGER update_community_posts_updated_at BEFORE UPDATE ON community_post
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================================
+-- USER THEME PREFERENCES
+-- ============================================================================
+ALTER TABLE users ADD COLUMN IF NOT EXISTS theme_preference TEXT DEFAULT 'blue' CHECK (theme_preference IN ('blue', 'yellow'));
+
+-- ============================================================================
+-- USER SUBSCRIPTIONS (Premium Features)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS user_subscriptions (
+  id BIGSERIAL PRIMARY KEY,
+  username TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+  plan_type TEXT NOT NULL CHECK (plan_type IN ('free', 'pro')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'cancelled')),
+  start_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  end_date TIMESTAMP WITH TIME ZONE, -- NULL for free plan, set for pro plan
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(username)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_username ON user_subscriptions(username);
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_status ON user_subscriptions(status);
+
+DROP TRIGGER IF EXISTS update_user_subscriptions_updated_at ON user_subscriptions;
+CREATE TRIGGER update_user_subscriptions_updated_at BEFORE UPDATE ON user_subscriptions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- PAYMENT TRANSACTIONS (Test Payment History)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS payment_transactions (
+  id BIGSERIAL PRIMARY KEY,
+  username TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+  amount DECIMAL(10, 2) NOT NULL,
+  currency TEXT DEFAULT 'VND',
+  plan_type TEXT NOT NULL CHECK (plan_type IN ('pro')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
+  payment_method TEXT DEFAULT 'test', -- test payment
+  transaction_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_username ON payment_transactions(username);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_status ON payment_transactions(status);
+
+-- ============================================================================
 -- ROW LEVEL SECURITY (RLS) - Optional, configure based on needs
 -- ============================================================================
 -- Enable RLS on sensitive tables

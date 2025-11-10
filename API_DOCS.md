@@ -825,6 +825,206 @@ Distance is calculated using the Haversine formula and returned in the response.
 
 ---
 
+## Payment & Subscription Endpoints
+
+### Get Available Plans
+
+Get all available subscription plans (Free and Pro).
+
+```http
+GET /payments/plans
+```
+
+**Response:**
+```json
+{
+  "plans": [
+    {
+      "id": "free",
+      "name": "Free Plan",
+      "price": 0,
+      "currency": "VND",
+      "features": [
+        "16 friends limit",
+        "Basic messaging",
+        "Standard theme (Blue)",
+        "Event participation",
+        "Community access"
+      ],
+      "max_friends": 16,
+      "theme": "blue",
+      "ai_enabled": false
+    },
+    {
+      "id": "pro",
+      "name": "Pro Plan",
+      "price": 50000,
+      "currency": "VND",
+      "duration": "monthly",
+      "features": [
+        "512 friends limit",
+        "Premium messaging",
+        "Premium theme (Yellow)",
+        "AI post writing assistant (coming soon)",
+        "Priority event access",
+        "Ad-free experience"
+      ],
+      "max_friends": 512,
+      "theme": "yellow",
+      "ai_enabled": true
+    }
+  ]
+}
+```
+
+### Get User Subscription
+
+Get the current subscription status for a user.
+
+```http
+GET /payments/subscription?username=johndoe
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "username": "johndoe",
+  "plan_type": "pro",
+  "status": "active",
+  "start_date": "2025-01-01T00:00:00Z",
+  "end_date": "2025-02-01T00:00:00Z",
+  "created_at": "2025-01-01T00:00:00Z",
+  "updated_at": "2025-01-01T00:00:00Z"
+}
+```
+
+### Subscribe to Pro Plan
+
+Subscribe to the Pro plan (test payment - no real money).
+
+```http
+POST /payments/subscribe
+Content-Type: application/json
+
+{
+  "username": "johndoe",
+  "plan_type": "pro",
+  "payment_method": "test"
+}
+```
+
+**Response:**
+```json
+{
+  "subscription": {
+    "id": 1,
+    "username": "johndoe",
+    "plan_type": "pro",
+    "status": "active",
+    "start_date": "2025-01-01T00:00:00Z",
+    "end_date": "2025-02-01T00:00:00Z"
+  },
+  "transaction": {
+    "id": 1,
+    "username": "johndoe",
+    "amount": 50000,
+    "currency": "VND",
+    "plan_type": "pro",
+    "status": "completed",
+    "payment_method": "test",
+    "transaction_date": "2025-01-01T00:00:00Z"
+  },
+  "message": "Successfully subscribed to Pro plan!"
+}
+```
+
+**Effects:**
+- User's `is_premium` set to `true`
+- User's `max_friends` increased to 512
+- User's `theme_preference` changed to "yellow"
+- Subscription valid for 1 month from purchase date
+
+### Cancel Subscription
+
+Cancel the current subscription and downgrade to Free plan.
+
+```http
+POST /payments/cancel
+Content-Type: application/json
+
+{
+  "username": "johndoe"
+}
+```
+
+**Response:**
+```json
+{
+  "subscription": {
+    "id": 1,
+    "username": "johndoe",
+    "plan_type": "free",
+    "status": "cancelled",
+    "end_date": "2025-01-15T00:00:00Z"
+  },
+  "message": "Subscription cancelled. Downgraded to Free plan."
+}
+```
+
+**Effects:**
+- User's `is_premium` set to `false`
+- User's `max_friends` reduced to 16
+- User's `theme_preference` changed to "blue"
+
+### Get Payment History
+
+Get all payment transactions for a user.
+
+```http
+GET /payments/history?username=johndoe
+```
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "username": "johndoe",
+    "amount": 50000,
+    "currency": "VND",
+    "plan_type": "pro",
+    "status": "completed",
+    "payment_method": "test",
+    "transaction_date": "2025-01-01T00:00:00Z",
+    "created_at": "2025-01-01T00:00:00Z"
+  }
+]
+```
+
+---
+
+## WebSocket Events
+
+### Message Events
+
+**Client Sends:**
+- `send_message` - Send a message (data: conversationId, senderUsername, content, replyToMessageId)
+- `join_conversation` - Join a conversation room (data: conversationId)
+- `leave_conversation` - Leave a conversation room (data: conversationId)
+- `typing` - Typing indicator (data: conversationId, username, isTyping)
+- `mark_read` - Mark messages as read (data: conversationId, username, upToMessageId)
+
+**Server Emits:**
+- `message_sent` - Confirmation to sender that message was saved (to sender only)
+- `new_message` - New message received (broadcast to others in room)
+- `typing` - Someone is typing (broadcast to others in room)
+- `messages_read` - Messages marked as read (broadcast to room)
+- `user_status` - User online/offline status changed (broadcast to all)
+- `error` - Error message (to specific client)
+
+---
+
 ## Notes
 
 1. All timestamps are in ISO 8601 format (UTC)
@@ -834,3 +1034,6 @@ Distance is calculated using the Haversine formula and returned in the response.
 5. Null values are allowed for optional fields
 6. WebSocket connection auto-updates user online status
 7. Messages sent via WebSocket are also saved to database for persistence
+8. **Payment system is for testing only** - no real money is charged
+9. Subscriptions are monthly and do not auto-renew
+10. Conversation endpoint now includes `other_participant` field for DM conversations with name and avatar
