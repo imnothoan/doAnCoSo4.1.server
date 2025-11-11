@@ -255,49 +255,6 @@ router.put("/:id", async (req, res) => {
 /* ------------------------------- Search & Check ------------------------------ */
 
 /**
- * Get all users with optional filters
- * GET /users?limit=20&gender=Male&min_age=18&max_age=30
- */
-router.get("/", async (req, res) => {
-  const limit = Math.min(Number(req.query.limit || 20), 100);
-  const genderParam = req.query.gender;
-  const minAge = req.query.min_age ? Number(req.query.min_age) : null;
-  const maxAge = req.query.max_age ? Number(req.query.max_age) : null;
-
-  // Validate gender parameter (only allow specific values)
-  const validGenders = ["Male", "Female", "Other"];
-  const gender = genderParam && validGenders.includes(genderParam) ? genderParam : null;
-
-  try {
-    let query = supabase
-      .from("users")
-      .select("id, email, name, avatar, bio, username, country, city, status, gender, age, latitude, longitude, is_online, interests")
-      .order("created_at", { ascending: false })
-      .limit(limit);
-
-    if (gender) {
-      query = query.eq("gender", gender);
-    }
-
-    if (minAge !== null) {
-      query = query.gte("age", minAge);
-    }
-
-    if (maxAge !== null) {
-      query = query.lte("age", maxAge);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    res.json(data || []);
-  } catch (err) {
-    console.error("get users error:", err);
-    res.status(500).json({ message: "Server error while fetching users." });
-  }
-});
-
-/**
  * Search users by username or name (case-insensitive)
  * GET /users/search?q=keyword
  */
@@ -341,9 +298,9 @@ router.get("/check-username", async (req, res) => {
 /**
  * Get user by ID (UUID format) - client-preferred endpoint
  * GET /users/:id
- * This must come before /:username routes to properly match UUIDs
+ * This must come before /:username routes and / route to properly match UUIDs
  */
-router.get("/:id([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", async (req, res) => {
+router.get("/:id([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})", async (req, res) => {
   const { id } = req.params;
   try {
     const user = await getUserById(id);
@@ -359,6 +316,49 @@ router.get("/:id([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
   } catch (err) {
     console.error("get by id error:", err);
     res.status(500).json({ message: "Server error while fetching profile." });
+  }
+});
+
+/**
+ * Get all users with optional filters
+ * GET /users?limit=20&gender=Male&min_age=18&max_age=30
+ */
+router.get("/", async (req, res) => {
+  const limit = Math.min(Number(req.query.limit || 20), 100);
+  const genderParam = req.query.gender;
+  const minAge = req.query.min_age ? Number(req.query.min_age) : null;
+  const maxAge = req.query.max_age ? Number(req.query.max_age) : null;
+
+  // Validate gender parameter (only allow specific values)
+  const validGenders = ["Male", "Female", "Other"];
+  const gender = genderParam && validGenders.includes(genderParam) ? genderParam : null;
+
+  try {
+    let query = supabase
+      .from("users")
+      .select("id, email, name, avatar, bio, username, country, city, status, gender, age, latitude, longitude, is_online, interests")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (gender) {
+      query = query.eq("gender", gender);
+    }
+
+    if (minAge !== null) {
+      query = query.gte("age", minAge);
+    }
+
+    if (maxAge !== null) {
+      query = query.lte("age", maxAge);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    res.json(data || []);
+  } catch (err) {
+    console.error("get users error:", err);
+    res.status(500).json({ message: "Server error while fetching users." });
   }
 });
 
