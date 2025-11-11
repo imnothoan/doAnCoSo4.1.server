@@ -447,6 +447,27 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- ============================================================================
+-- CONVERSATION OVERVIEW VIEW (for unread counts and last message)
+-- ============================================================================
+-- Note: This view can be used for optimized queries, but the code also has
+-- a fallback implementation that calculates unread counts directly
+CREATE OR REPLACE VIEW v_conversation_overview AS
+SELECT 
+  cm.conversation_id,
+  cm.username,
+  MAX(m.created_at) as last_message_at,
+  COUNT(m.id) FILTER (
+    WHERE NOT EXISTS (
+      SELECT 1 FROM message_reads mr 
+      WHERE mr.message_id = m.id 
+      AND mr.username = cm.username
+    )
+  ) as unread_count
+FROM conversation_members cm
+LEFT JOIN messages m ON m.conversation_id = cm.conversation_id
+GROUP BY cm.conversation_id, cm.username;
+
 -- Trigger to update timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
