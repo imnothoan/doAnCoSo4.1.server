@@ -238,27 +238,60 @@ router.get("/conversations", async (req, res) => {
 
     const unreadByConv = new Map((overview || []).map((o) => [o.conversation_id, o.unread_count || 0]));
 
-    // For DM conversations, get the other participant's info
+    // For DM conversations, get the other participant's info (optimized)
     const dmConvs = (convs || []).filter((c) => c.type === "dm");
     const otherParticipants = new Map();
     
-    for (const conv of dmConvs) {
-      const { data: members, error: memErr } = await supabase
-        .from("conversation_members")
-        .select("username")
-        .eq("conversation_id", conv.id);
+    if (dmConvs.length > 0) {
+      const dmConvIds = dmConvs.map(c => c.id);
       
-      if (!memErr && members && members.length === 2) {
-        const otherUsername = members.find((m) => m.username !== viewer)?.username;
-        if (otherUsername) {
-          const { data: otherUser, error: userErr } = await supabase
+      // Fetch all members for DM conversations in one query
+      const { data: allMembers, error: memErr } = await supabase
+        .from("conversation_members")
+        .select("conversation_id, username")
+        .in("conversation_id", dmConvIds);
+      
+      if (!memErr && allMembers) {
+        // Group members by conversation_id
+        const membersByConv = new Map();
+        allMembers.forEach((m) => {
+          if (!membersByConv.has(m.conversation_id)) {
+            membersByConv.set(m.conversation_id, []);
+          }
+          membersByConv.get(m.conversation_id).push(m.username);
+        });
+        
+        // Find other usernames
+        const otherUsernames = [];
+        const convToUsername = new Map();
+        membersByConv.forEach((members, convId) => {
+          if (members.length === 2) {
+            const otherUsername = members.find((u) => u !== viewer);
+            if (otherUsername) {
+              otherUsernames.push(otherUsername);
+              convToUsername.set(convId, otherUsername);
+            }
+          }
+        });
+        
+        // Fetch all other users in one query
+        if (otherUsernames.length > 0) {
+          const { data: otherUsers, error: userErr } = await supabase
             .from("users")
             .select("id, username, name, avatar")
-            .eq("username", otherUsername)
-            .single();
+            .in("username", otherUsernames);
           
-          if (!userErr && otherUser) {
-            otherParticipants.set(conv.id, otherUser);
+          if (!userErr && otherUsers) {
+            // Map users by username
+            const usersByUsername = new Map(otherUsers.map((u) => [u.username, u]));
+            
+            // Build the otherParticipants map
+            convToUsername.forEach((username, convId) => {
+              const user = usersByUsername.get(username);
+              if (user) {
+                otherParticipants.set(convId, user);
+              }
+            });
           }
         }
       }
