@@ -2,11 +2,24 @@
 
 Backend server for ConnectSphere (UniVini-like) app built with Express.js and Supabase.
 
+## ✨ Latest Updates
+
+### Background Image Feature (Tinder-Style Hangout)
+- 🖼️ **Background Images**: Users can upload background images separate from avatars
+- 👥 **Online Users Discovery**: Hangout endpoint now shows only online users
+- 📍 **Distance-Based Matching**: Filter users by proximity
+- 💫 **Tinder-Style Cards**: Perfect for swipe-based user discovery
+
+**See detailed documentation:**
+- 📖 [English Setup Guide](BACKGROUND_IMAGE_SETUP.md)
+- 📖 [Vietnamese Guide (Tiếng Việt)](HUONG_DAN_TRIEN_KHAI.md)
+- 📖 [Implementation Summary](IMPLEMENTATION_SUMMARY.md)
+
 ## Features
 
-- **User Management**: Complete profile system with languages, countries, interests
+- **User Management**: Complete profile system with languages, countries, interests, and background images
 - **Events System**: Create, manage, and participate in events
-- **Hangouts**: Connect with nearby users based on activities and interests
+- **Hangouts**: Connect with nearby online users based on activities and interests (Tinder-style)
 - **Communities**: Discussion groups with posts, likes, and comments
 - **Messaging**: Real-time conversations with media support
 - **Notifications**: Push notifications for various activities
@@ -79,6 +92,8 @@ The server will start on port 3000 (or the PORT specified in .env).
 - `GET /users/:username/following` - Get users following
 - `GET /users/:username/posts` - Get user posts
 - `POST /users/upload-avatar` - Upload avatar
+- `POST /users/:userId/avatar` - Upload avatar (client-preferred)
+- **`POST /users/:userId/background-image`** - Upload background image (NEW)
 - `GET /users/:username/languages` - Get user languages
 - `POST /users/:username/languages` - Add user language
 - `GET /users/:username/countries` - Get user countries
@@ -101,10 +116,10 @@ The server will start on port 3000 (or the PORT specified in .env).
 - `GET /events/user/:username/participating` - Get user's participating events
 
 ### Hangouts (`/hangouts`)
+- **`GET /hangouts`** - Get online users for Tinder-style hangout (UPDATED - returns users instead of hangout objects)
 - `PUT /hangouts/status` - Update hangout availability
 - `GET /hangouts/status/:username` - Get hangout status
 - `POST /hangouts` - Create hangout
-- `GET /hangouts` - List hangouts (with filters: languages, distance)
 - `GET /hangouts/:id` - Get hangout details
 - `PUT /hangouts/:id` - Update hangout
 - `DELETE /hangouts/:id` - Delete hangout
