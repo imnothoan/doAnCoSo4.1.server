@@ -242,9 +242,17 @@ router.put("/:id", async (req, res) => {
       .update(updates)
       .eq("id", id)
       .select("*")
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+
+    if (!data) {
+      console.warn(`User profile update attempted for non-existent ID: ${id}`);
+      return res.status(404).json({ 
+        message: "User not found with the provided ID." 
+      });
+    }
+
     res.json(data);
   } catch (err) {
     console.error("update profile error:", err);
