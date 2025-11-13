@@ -186,14 +186,14 @@ router.get("/username/:username", async (req, res) => {
 /**
  * Update profile by id
  * PUT /users/:id
- * Body: { name?, gender?, bio?, avatar?, username?, status?, age?, date_of_birth?,
+ * Body: { name?, gender?, bio?, avatar?, background_image?, username?, status?, age?, date_of_birth?,
  *         country?, city?, flag?, interests?, about_me?, specialties?, 
  *         latitude?, longitude?, is_online? }
  */
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
   const { 
-    name, gender, bio, avatar, username, status, age, date_of_birth,
+    name, gender, bio, avatar, background_image, username, status, age, date_of_birth,
     country, city, flag, interests, about_me, specialties,
     latitude, longitude, is_online
   } = req.body;
@@ -217,6 +217,7 @@ router.put("/:id", async (req, res) => {
     if (gender !== undefined) updates.gender = gender;
     if (bio !== undefined) updates.bio = bio;
     if (avatar !== undefined) updates.avatar = avatar;
+    if (background_image !== undefined) updates.background_image = background_image;
     if (username !== undefined) updates.username = username;
     if (status !== undefined) updates.status = status;
     if (age !== undefined) updates.age = age;
@@ -731,6 +732,69 @@ router.post("/upload-avatar", upload.single("avatar"), async (req, res) => {
   } catch (err) {
     console.error("upload-avatar error:", err);
     res.status(500).json({ message: "Server error while uploading avatar." });
+  }
+});
+
+/* ------------------------- Background Image Upload ------------------------- */
+
+/**
+ * Upload background image to Supabase Storage and update profile
+ * POST /users/:userId/background-image
+ * FormData: background_image (file)
+ */
+router.post("/:userId/background-image", upload.single("background_image"), async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ message: "No file uploaded." });
+    }
+
+    // Get user to verify existence
+    const user = await getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Generate unique filename
+    const fileName = `${userId}-${Date.now()}.${file.mimetype.split('/')[1]}`;
+    
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("background-images")
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("Upload error:", uploadError);
+      return res.status(500).json({ message: "Failed to upload image." });
+    }
+
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage
+      .from("background-images")
+      .getPublicUrl(fileName);
+
+    const backgroundImageUrl = publicUrlData.publicUrl;
+
+    // Update user record
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({ background_image: backgroundImageUrl })
+      .eq("id", userId);
+
+    if (updateError) {
+      console.error("Update error:", updateError);
+      return res.status(500).json({ message: "Failed to update profile." });
+    }
+
+    res.json({ backgroundImageUrl });
+  } catch (error) {
+    console.error("Upload background image error:", error);
+    res.status(500).json({ message: "Server error while uploading background image." });
   }
 });
 
