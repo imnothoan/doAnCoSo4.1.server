@@ -19,50 +19,93 @@ function initializeWebSocket(httpServer, allowedOrigins) {
   const onlineUsers = new Map();
 
   io.on("connection", (socket) => {
-    console.log("WebSocket client connected:", socket.id);
+    console.log("🔌 WebSocket client connected:", socket.id);
 
     let currentUsername = null;
+    let heartbeatInterval = null;
 
     // Handle authentication
     const token = socket.handshake.auth.token;
+    
+    console.log("🔐 WebSocket auth attempt:", {
+      socketId: socket.id,
+      hasToken: !!token,
+      tokenLength: token?.length,
+    });
+    
     if (token) {
       // In production, verify JWT token here
       // For now, we'll extract username from the token (base64 encoded: id:timestamp)
-      try {
-        const decoded = Buffer.from(token, "base64").toString("utf-8");
-        const userId = decoded.split(":")[0];
-        
-        // Get user from database
-        supabase
-          .from("users")
-          .select("username")
-          .eq("id", userId)
-          .single()
-          .then(({ data, error }) => {
-            if (!error && data) {
-              currentUsername = data.username;
-              onlineUsers.set(currentUsername, socket.id);
-              
-              // Update user online status in database
-              supabase
-                .from("users")
-                .update({ is_online: true })
-                .eq("username", currentUsername)
-                .then(() => {
-                  // Notify others that user is online
-                  socket.broadcast.emit("user_status", {
-                    username: currentUsername,
-                    isOnline: true,
-                  });
-                });
-              
-              console.log(`User ${currentUsername} authenticated and online`);
-            }
-          });
-      } catch (err) {
-        console.error("Auth error:", err);
-      }
+      (async () => {
+        try {
+          const decoded = Buffer.from(token, "base64").toString("utf-8");
+          const userId = decoded.split(":")[0];
+          
+          console.log("🔍 Decoded token - userId:", userId);
+          
+          // Get user from database
+          const { data, error } = await supabase
+            .from("users")
+            .select("username, id")
+            .eq("id", userId)
+            .single();
+          
+          if (error || !data) {
+            console.error("❌ User not found for ID:", userId, error);
+            return;
+          }
+          
+          console.log("✅ User authenticated:", data.username);
+          
+          currentUsername = data.username;
+          onlineUsers.set(currentUsername, socket.id);
+          
+          // Update user online status in database with error handling
+          const { error: updateError } = await supabase
+            .from("users")
+            .update({ is_online: true })
+            .eq("username", currentUsername);
+          
+          if (updateError) {
+            console.error("❌ Failed to update online status:", updateError);
+          } else {
+            console.log(`✅ ${currentUsername} marked as online`);
+            
+            // Notify others that user is online
+            socket.broadcast.emit("user_status", {
+              username: currentUsername,
+              isOnline: true,
+            });
+          }
+          
+          // Start heartbeat mechanism
+          heartbeatInterval = setInterval(() => {
+            socket.emit("heartbeat");
+          }, 30000); // Send heartbeat every 30 seconds
+          
+        } catch (err) {
+          console.error("❌ Auth error:", err);
+        }
+      })();
     }
+    
+    // Handle heartbeat acknowledgment
+    socket.on("heartbeat_ack", async () => {
+      // User is still active, refresh online status
+      if (currentUsername) {
+        try {
+          await supabase
+            .from("users")
+            .update({ 
+              is_online: true,
+              last_seen: new Date().toISOString()
+            })
+            .eq("username", currentUsername);
+        } catch (err) {
+          console.error("❌ Error updating heartbeat status:", err);
+        }
+      }
+    });
 
     // Join a conversation room
     socket.on("join_conversation", ({ conversationId }) => {
@@ -176,27 +219,46 @@ function initializeWebSocket(httpServer, allowedOrigins) {
     });
 
     // Handle disconnect
-    socket.on("disconnect", () => {
-      console.log("WebSocket client disconnected:", socket.id);
+    socket.on("disconnect", async (reason) => {
+      console.log("❌ WebSocket disconnected:", {
+        socketId: socket.id,
+        username: currentUsername,
+        reason,
+      });
+      
+      // Clear heartbeat interval
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+      }
       
       if (currentUsername) {
         onlineUsers.delete(currentUsername);
         
-        // Update user offline status in database
-        supabase
-          .from("users")
-          .update({ 
-            is_online: false,
-            last_seen: new Date().toISOString() 
-          })
-          .eq("username", currentUsername)
-          .then(() => {
+        try {
+          // Update user offline status in database
+          const { error } = await supabase
+            .from("users")
+            .update({ 
+              is_online: false,
+              last_seen: new Date().toISOString() 
+            })
+            .eq("username", currentUsername);
+          
+          if (error) {
+            console.error("❌ Failed to update offline status:", error);
+          } else {
+            console.log(`✅ ${currentUsername} marked as offline`);
+            
             // Notify others that user is offline
             socket.broadcast.emit("user_status", {
               username: currentUsername,
               isOnline: false,
             });
-          });
+          }
+        } catch (err) {
+          console.error("❌ Error in disconnect handler:", err);
+        }
       }
     });
   });
