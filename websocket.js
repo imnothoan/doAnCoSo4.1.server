@@ -58,6 +58,8 @@ function initializeWebSocket(httpServer, allowedOrigins) {
           console.log("✅ User authenticated:", data.username);
           
           currentUsername = data.username;
+          // Store username on socket object for easy lookup
+          socket.username = currentUsername;
           onlineUsers.set(currentUsername, socket.id);
           
           // Update user online status in database with error handling
@@ -188,16 +190,18 @@ function initializeWebSocket(httpServer, allowedOrigins) {
         // 6. Ensure each participant's sockets join the room + emit message directly
         if (participants && participants.length > 0) {
           participants.forEach(p => {
-            // Find all sockets of this participant
+            // Find all sockets of this participant using stored username
             for (const [id, s] of io.sockets.sockets) {
-              const sockUser = s.handshake.auth?.token; // bạn dùng token = username ở client
-              if (sockUser === p.username) {
+              // Use the username stored on socket object (set during auth)
+              if (s.username === p.username) {
                 // Join room if not yet
                 if (!s.rooms.has(roomName)) {
                   s.join(roomName);
+                  console.log(`🔗 Auto-joined ${p.username} to room ${roomName}`);
                 }
-                // Emit new_message trực tiếp (phòng ngừa chưa join kịp)
+                // Emit new_message directly to ensure delivery
                 s.emit("new_message", messagePayload);
+                console.log(`📨 Sent message directly to ${p.username}`);
               }
             }
           });
