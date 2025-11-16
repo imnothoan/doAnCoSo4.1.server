@@ -169,20 +169,25 @@ function initializeWebSocket(httpServer, allowedOrigins) {
           return;
         }
 
-        // Emit to sender (confirmation) and broadcast to others in the room
-        const roomName = `conversation_${conversationId}`;
-        
-        // Emit to sender (confirmation)
-        socket.emit("message_sent", message);
+// Emit to sender (confirmation) and broadcast to others in the room
+const roomName = `conversation_${conversationId}`;
 
-        // Broadcast to others in the room with full sender info
-        socket.to(roomName).emit("new_message", {
-          ...message,
-          chatId: conversationId,  // Add for client compatibility
-          senderId: senderUsername, // Add for client compatibility
-        });
+// Create message payload with complete data
+const messagePayload = {
+  ...message,
+  chatId: conversationId,  // Add for client compatibility
+  senderId: senderUsername, // Add for client compatibility
+  timestamp: message.created_at, // Add for client compatibility
+};
 
-        console.log(`Message sent in conversation ${conversationId} by ${senderUsername}`);
+// Emit to sender (confirmation)
+socket.emit("message_sent", messagePayload);
+
+// Broadcast to ALL clients in the room (including sender) for inbox list updates
+// This ensures inbox lists update in real-time for all participants
+io.to(roomName).emit("new_message", messagePayload);
+
+console.log(`Message sent in conversation ${conversationId} by ${senderUsername}`);
       } catch (err) {
         console.error("send_message error:", err);
         socket.emit("error", { message: "Server error while sending message" });
