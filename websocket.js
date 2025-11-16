@@ -122,9 +122,10 @@ function initializeWebSocket(httpServer, allowedOrigins) {
     });
 
     // Send a message
+        // Send a message
     socket.on("send_message", async ({ conversationId, senderUsername, content, replyToMessageId }) => {
       try {
-        // Verify sender is a member
+        // 1. Verify membership
         const { data: membership } = await supabase
           .from("conversation_members")
           .select("username")
@@ -137,19 +138,16 @@ function initializeWebSocket(httpServer, allowedOrigins) {
           return;
         }
 
-        // Insert message into database
-        // Insert message with sender profile joined
+        // 2. Insert message (giữ nguyên phần insert cũ)
         const { data: message, error } = await supabase
           .from("messages")
-          .insert([
-            {
-              conversation_id: conversationId,
-              sender_username: senderUsername,
-              message_type: "text",
-              content,
-              reply_to_message_id: replyToMessageId || null,
-            },
-          ])
+          .insert([{
+            conversation_id: conversationId,
+            sender_username: senderUsername,
+            message_type: "text",
+            content,
+            reply_to_message_id: replyToMessageId || null,
+          }])
           .select(`
             id,
             conversation_id,
@@ -158,7 +156,6 @@ function initializeWebSocket(httpServer, allowedOrigins) {
             content,
             reply_to_message_id,
             created_at,
-            updated_at,
             sender:users!messages_sender_username_fkey(id, username, name, avatar, email, country, city, status, bio, age, gender, interests, is_online)
           `)
           .single();
@@ -169,25 +166,47 @@ function initializeWebSocket(httpServer, allowedOrigins) {
           return;
         }
 
-// Emit to sender (confirmation) and broadcast to others in the room
-const roomName = `conversation_${conversationId}`;
+        const roomName = `conversation_${conversationId}`;
 
-// Create message payload with complete data
-const messagePayload = {
-  ...message,
-  chatId: conversationId,  // Add for client compatibility
-  senderId: senderUsername, // Add for client compatibility
-  timestamp: message.created_at, // Add for client compatibility
-};
+        // 3. Build payload
+        const messagePayload = {
+          ...message,
+          chatId: conversationId,
+          senderId: message.sender_username,
+          timestamp: message.created_at,
+        };
 
-// Emit to sender (confirmation)
-socket.emit("message_sent", messagePayload);
+        // 4. Get all participants of conversation
+        const { data: participants } = await supabase
+          .from("conversation_members")
+          .select("username")
+          .eq("conversation_id", conversationId);
 
-// Broadcast to ALL clients in the room (including sender) for inbox list updates
-// This ensures inbox lists update in real-time for all participants
-io.to(roomName).emit("new_message", messagePayload);
+        // 5. Emit confirmation to sender
+        socket.emit("message_sent", messagePayload);
 
-console.log(`Message sent in conversation ${conversationId} by ${senderUsername}`);
+        // 6. Ensure each participant's sockets join the room + emit message directly
+        if (participants && participants.length > 0) {
+          participants.forEach(p => {
+            // Find all sockets of this participant
+            for (const [id, s] of io.sockets.sockets) {
+              const sockUser = s.handshake.auth?.token; // bạn dùng token = username ở client
+              if (sockUser === p.username) {
+                // Join room if not yet
+                if (!s.rooms.has(roomName)) {
+                  s.join(roomName);
+                }
+                // Emit new_message trực tiếp (phòng ngừa chưa join kịp)
+                s.emit("new_message", messagePayload);
+              }
+            }
+          });
+        }
+
+        // 7. Broadcast vào room (giữ nguyên để những ai đã trong room nhận)
+        io.to(roomName).emit("new_message", messagePayload);
+
+        console.log(`Message sent in conversation ${conversationId} by ${senderUsername}`);
       } catch (err) {
         console.error("send_message error:", err);
         socket.emit("error", { message: "Server error while sending message" });
