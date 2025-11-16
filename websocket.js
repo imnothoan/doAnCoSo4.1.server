@@ -138,6 +138,7 @@ function initializeWebSocket(httpServer, allowedOrigins) {
         }
 
         // Insert message into database
+        // Insert message with sender profile joined
         const { data: message, error } = await supabase
           .from("messages")
           .insert([
@@ -149,7 +150,17 @@ function initializeWebSocket(httpServer, allowedOrigins) {
               reply_to_message_id: replyToMessageId || null,
             },
           ])
-          .select("id, conversation_id, sender_username, message_type, content, reply_to_message_id, created_at, updated_at")
+          .select(`
+            id,
+            conversation_id,
+            sender_username,
+            message_type,
+            content,
+            reply_to_message_id,
+            created_at,
+            updated_at,
+            sender:users!messages_sender_username_fkey(id, username, name, avatar, email, country, city)
+          `)
           .single();
 
         if (error) {
@@ -161,11 +172,15 @@ function initializeWebSocket(httpServer, allowedOrigins) {
         // Emit to sender (confirmation) and broadcast to others in the room
         const roomName = `conversation_${conversationId}`;
         
-        // Send confirmation to sender with the saved message
+        // Emit to sender (confirmation)
         socket.emit("message_sent", message);
-        
-        // Broadcast to others in the room (not to sender)
-        socket.to(roomName).emit("new_message", message);
+
+        // Broadcast to others in the room with full sender info
+        socket.to(roomName).emit("new_message", {
+          ...message,
+          chatId: conversationId,  // Add for client compatibility
+          senderId: senderUsername, // Add for client compatibility
+        });
 
         console.log(`Message sent in conversation ${conversationId} by ${senderUsername}`);
       } catch (err) {
