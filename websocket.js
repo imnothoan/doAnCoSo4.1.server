@@ -159,7 +159,7 @@ function initializeWebSocket(httpServer, allowedOrigins) {
             reply_to_message_id,
             created_at,
             updated_at,
-            sender:users!messages_sender_username_fkey(id, username, name, avatar, email, country, city)
+            sender:users!messages_sender_username_fkey(id, username, name, avatar, email, country, city, status, bio, age, gender, interests, is_online)
           `)
           .single();
 
