@@ -19,7 +19,7 @@ function initializeWebSocket(httpServer, allowedOrigins) {
   const onlineUsers = new Map();
 
   io.on("connection", (socket) => {
-    console.log("🔌 WebSocket client connected:", socket.id);
+    console.log("WebSocket client connected:", socket.id);
 
     let currentUsername = null;
     let heartbeatInterval = null;
@@ -27,7 +27,7 @@ function initializeWebSocket(httpServer, allowedOrigins) {
     // Handle authentication
     const token = socket.handshake.auth.token;
     
-    console.log("🔐 WebSocket auth attempt:", {
+    console.log("WebSocket auth attempt:", {
       socketId: socket.id,
       hasToken: !!token,
       tokenLength: token?.length,
@@ -41,7 +41,7 @@ function initializeWebSocket(httpServer, allowedOrigins) {
           const decoded = Buffer.from(token, "base64").toString("utf-8");
           const userId = decoded.split(":")[0];
           
-          console.log("🔍 Decoded token - userId:", userId);
+          console.log("Decoded token - userId:", userId);
           
           // Get user from database
           const { data, error } = await supabase
@@ -51,11 +51,11 @@ function initializeWebSocket(httpServer, allowedOrigins) {
             .single();
           
           if (error || !data) {
-            console.error("❌ User not found for ID:", userId, error);
+            console.error("User not found for ID:", userId, error);
             return;
           }
           
-          console.log("✅ User authenticated:", data.username);
+          console.log("User authenticated:", data.username);
           
           currentUsername = data.username;
           // Store username on socket object for easy lookup
@@ -69,9 +69,9 @@ function initializeWebSocket(httpServer, allowedOrigins) {
             .eq("username", currentUsername);
           
           if (updateError) {
-            console.error("❌ Failed to update online status:", updateError);
+            console.error("Failed to update online status:", updateError);
           } else {
-            console.log(`✅ ${currentUsername} marked as online`);
+            console.log(`${currentUsername} marked as online`);
             
             // Notify others that user is online
             socket.broadcast.emit("user_status", {
@@ -86,7 +86,7 @@ function initializeWebSocket(httpServer, allowedOrigins) {
           }, 30000); // Send heartbeat every 30 seconds
           
         } catch (err) {
-          console.error("❌ Auth error:", err);
+          console.error("Auth error:", err);
         }
       })();
     }
@@ -104,7 +104,7 @@ function initializeWebSocket(httpServer, allowedOrigins) {
             })
             .eq("username", currentUsername);
         } catch (err) {
-          console.error("❌ Error updating heartbeat status:", err);
+          console.error("Error updating heartbeat status:", err);
         }
       }
     });
@@ -197,11 +197,11 @@ function initializeWebSocket(httpServer, allowedOrigins) {
                 // Join room if not yet
                 if (!s.rooms.has(roomName)) {
                   s.join(roomName);
-                  console.log(`🔗 Auto-joined ${p.username} to room ${roomName}`);
+                  console.log(`Auto-joined ${p.username} to room ${roomName}`);
                 }
                 // Emit new_message directly to ensure delivery
                 s.emit("new_message", messagePayload);
-                console.log(`📨 Sent message directly to ${p.username}`);
+                console.log(`Sent message directly to ${p.username}`);
               }
             }
           });
@@ -263,7 +263,7 @@ function initializeWebSocket(httpServer, allowedOrigins) {
 
     // Handle disconnect
     socket.on("disconnect", async (reason) => {
-      console.log("❌ WebSocket disconnected:", {
+      console.log("WebSocket disconnected:", {
         socketId: socket.id,
         username: currentUsername,
         reason,
@@ -289,9 +289,9 @@ function initializeWebSocket(httpServer, allowedOrigins) {
             .eq("username", currentUsername);
           
           if (error) {
-            console.error("❌ Failed to update offline status:", error);
+            console.error("Failed to update offline status:", error);
           } else {
-            console.log(`✅ ${currentUsername} marked as offline`);
+            console.log(`${currentUsername} marked as offline`);
             
             // Notify others that user is offline
             socket.broadcast.emit("user_status", {
@@ -300,13 +300,13 @@ function initializeWebSocket(httpServer, allowedOrigins) {
             });
           }
         } catch (err) {
-          console.error("❌ Error in disconnect handler:", err);
+          console.error("Error in disconnect handler:", err);
         }
       }
     });
   });
 
-  console.log("✅ WebSocket server initialized");
+  console.log("WebSocket server initialized");
   return io;
 }
 
