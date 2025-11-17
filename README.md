@@ -4,6 +4,17 @@ Backend server for ConnectSphere (UniVini-like) app built with Express.js and Su
 
 ## ✨ Latest Updates
 
+### Stripe Payment Integration 💳
+- 💰 **Real Payment Processing**: Integrated Stripe for secure payment handling
+- 🔒 **Server-Side Verification**: All payments verified server-side for security
+- 🧪 **Test Mode Support**: Both Stripe test mode and quick test mode available
+- 🚫 **Fraud Prevention**: Payment intent uniqueness prevents duplicate payments
+- 📊 **Transaction Tracking**: All payments logged with Stripe PaymentIntent IDs
+
+**See detailed documentation:**
+- 📖 [Stripe Integration Guide](STRIPE_INTEGRATION.md)
+- 🧪 [Payment Test Guide](PRO_PACKAGE_TEST_GUIDE.md)
+
 ### Background Image Feature (Tinder-Style Hangout)
 - 🖼️ **Background Images**: Users can upload background images separate from avatars
 - 👥 **Online Users Discovery**: Hangout endpoint now shows only online users
@@ -18,6 +29,7 @@ Backend server for ConnectSphere (UniVini-like) app built with Express.js and Su
 ## Features
 
 - **User Management**: Complete profile system with languages, countries, interests, and background images
+- **Payment System**: Stripe integration for Pro subscriptions with test and live modes
 - **Events System**: Create, manage, and participate in events
 - **Hangouts**: Connect with nearby online users based on activities and interests (Tinder-style)
 - **Communities**: Discussion groups with posts, likes, and comments
@@ -30,6 +42,7 @@ Backend server for ConnectSphere (UniVini-like) app built with Express.js and Su
 - **Node.js** (>= 18.0.0)
 - **Express.js**: Web framework
 - **Supabase**: PostgreSQL database and authentication
+- **Stripe**: Payment processing for Pro subscriptions
 - **Multer**: File upload handling
 - **Morgan**: HTTP request logger
 - **CORS**: Cross-origin resource sharing
@@ -52,7 +65,7 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env` with your Supabase credentials:
+Edit `.env` with your Supabase credentials and Stripe key:
 ```
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
@@ -61,6 +74,9 @@ CORS_ORIGIN=http://localhost:3000,http://localhost:19006
 POSTS_BUCKET=posts
 AVATARS_BUCKET=avatars
 MESSAGES_BUCKET=messages
+
+# Stripe Payment (get test keys from https://dashboard.stripe.com/test/apikeys)
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key_here
 ```
 
 4. **Set up database**
@@ -188,6 +204,18 @@ The server will start on port 3000 (or the PORT specified in .env).
 - `DELETE /quick-messages/:id` - Delete quick message
 - `GET /quick-messages/expand` - Expand shortcut
 
+### Payments (`/payments`) 💳
+- `GET /payments/plans` - Get available payment plans
+- `POST /payments/create-payment-intent` - Create Stripe payment intent (NEW)
+- `POST /payments/subscribe` - Subscribe to Pro plan (supports Stripe & test mode)
+- `POST /payments/cancel` - Cancel subscription
+- `GET /payments/subscription` - Get user's subscription status
+- `GET /payments/history` - Get payment transaction history
+
+**Payment Integration:**
+- See [Stripe Integration Guide](STRIPE_INTEGRATION.md) for setup and usage
+- Supports both Stripe payments and test mode for development
+
 ## Database Schema
 
 See `db/schema.sql` for the complete database schema including:
@@ -199,6 +227,11 @@ See `db/schema.sql` for the complete database schema including:
 - Notifications
 - Quick messages
 - User languages and countries
+- **Payment transactions and subscriptions** (NEW)
+
+### Recent Schema Updates
+- Added `payment_intent_id` column to `payment_transactions` table
+- See `db/migrations/add_stripe_payment_intent_id.sql` for migration
 
 ## Client Integration
 
