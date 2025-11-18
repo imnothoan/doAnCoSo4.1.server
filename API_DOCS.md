@@ -1266,7 +1266,7 @@ socket.emit('accept_call', { callId, acceptedBy: 'janedoe' });
 
 // 5. Caller gets call_accepted event
 socket.on('call_accepted', (data) => {
-  startWebRTCConnection(); // Start actual audio/video connection
+  openDailyCoRoom(callId); // Open Daily.co room in browser
 });
 
 // 6. Either party ends call
@@ -1295,4 +1295,4 @@ socket.on('call_ended', (data) => {
 11. **Voice/Video calling requires mutual follow** - both users must follow each other
 12. **Post endpoints include author info** - `authorAvatar` and `authorDisplayName` for display
 13. **Call IDs must be unique** - Use format `call_{timestamp}_{callerId}_{receiverId}`
-14. **WebRTC not included** - Server only handles signaling, actual media connection via WebRTC (client-side)
+14. **Video calls use Daily.co** - Server handles call signaling, Daily.co handles actual video/audio connection
