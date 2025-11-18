@@ -26,9 +26,13 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS email_confirmed BOOLEAN DEFAULT false
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT false;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS max_friends INTEGER DEFAULT 16; -- normal limit, unlimited for premium
 ALTER TABLE users ADD COLUMN IF NOT EXISTS background_image TEXT; -- URL for background image in Tinder-like hangout feature
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT; -- Bcrypt hashed password for authentication
 
 -- Index for background images
 CREATE INDEX IF NOT EXISTS idx_users_background_image ON users(background_image) WHERE background_image IS NOT NULL;
+
+-- Index for email lookups during login
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- ============================================================================
 -- USER LANGUAGES

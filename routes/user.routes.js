@@ -6,6 +6,12 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 /* ---------------------------------- Helpers ---------------------------------- */
 
+function sanitizeUser(user) {
+  if (!user) return null;
+  const { password_hash, ...sanitized } = user;
+  return sanitized;
+}
+
 async function countFollowers(username) {
   const { count, error } = await supabase
     .from("user_follows")
@@ -55,13 +61,13 @@ async function updateFollowCounters({ followerUsername, followeeUsername }) {
 async function getUserById(id) {
   const { data, error } = await supabase.from("users").select("*").eq("id", id).single();
   if (error) throw error;
-  return data || null;
+  return sanitizeUser(data);
 }
 
 async function getUserByUsername(username) {
   const { data, error } = await supabase.from("users").select("*").eq("username", username).single();
   if (error) throw error;
-  return data || null;
+  return sanitizeUser(data);
 }
 
 /* ----------------------------- Profile Endpoints ----------------------------- */
