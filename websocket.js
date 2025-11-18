@@ -261,6 +261,133 @@ function initializeWebSocket(httpServer, allowedOrigins) {
       }
     });
 
+    // ==================== Voice/Video Calling Events ====================
+    
+    // Initiate a call (voice or video)
+    socket.on("initiate_call", async (callData) => {
+      try {
+        const { callerId, receiverId, callType, callId } = callData;
+        
+        // Verify both users are mutual follows (both follow each other)
+        const { data: follows, error: followError } = await supabase
+          .from("user_follows")
+          .select("follower_username, followee_username")
+          .or(`and(follower_username.eq.${callerId},followee_username.eq.${receiverId}),and(follower_username.eq.${receiverId},followee_username.eq.${callerId})`);
+        
+        if (followError) {
+          console.error("Error checking follow status:", followError);
+          socket.emit("error", { message: "Failed to verify follow status" });
+          return;
+        }
+        
+        // Check if both users follow each other (mutual follow)
+        const callerFollowsReceiver = follows?.some(
+          f => f.follower_username === callerId && f.followee_username === receiverId
+        );
+        const receiverFollowsCaller = follows?.some(
+          f => f.follower_username === receiverId && f.followee_username === callerId
+        );
+        
+        if (!callerFollowsReceiver || !receiverFollowsCaller) {
+          socket.emit("error", { 
+            message: "Can only call users who mutually follow you",
+            code: "NOT_MUTUAL_FOLLOW"
+          });
+          return;
+        }
+        
+        // Find receiver's socket
+        const receiverSocketId = onlineUsers.get(receiverId);
+        if (!receiverSocketId) {
+          socket.emit("error", { 
+            message: "User is not online",
+            code: "USER_OFFLINE"
+          });
+          return;
+        }
+        
+        // Send incoming call to receiver
+        io.to(receiverSocketId).emit("incoming_call", callData);
+        console.log(`Call initiated from ${callerId} to ${receiverId} (${callType})`);
+        
+      } catch (err) {
+        console.error("initiate_call error:", err);
+        socket.emit("error", { message: "Failed to initiate call" });
+      }
+    });
+    
+    // Accept an incoming call
+    socket.on("accept_call", async ({ callId, acceptedBy }) => {
+      try {
+        // Notify the caller that the call was accepted
+        // We need to find the caller's socket based on the callId
+        // callId format: call_timestamp_callerId_receiverId
+        const parts = callId.split("_");
+        if (parts.length >= 4) {
+          const callerId = parts[2];
+          const callerSocketId = onlineUsers.get(callerId);
+          
+          if (callerSocketId) {
+            io.to(callerSocketId).emit("call_accepted", { 
+              callId,
+              acceptedBy 
+            });
+            console.log(`Call ${callId} accepted by ${acceptedBy}`);
+          }
+        }
+      } catch (err) {
+        console.error("accept_call error:", err);
+      }
+    });
+    
+    // Reject an incoming call
+    socket.on("reject_call", async ({ callId, rejectedBy }) => {
+      try {
+        // Notify the caller that the call was rejected
+        const parts = callId.split("_");
+        if (parts.length >= 4) {
+          const callerId = parts[2];
+          const callerSocketId = onlineUsers.get(callerId);
+          
+          if (callerSocketId) {
+            io.to(callerSocketId).emit("call_rejected", { 
+              callId,
+              rejectedBy 
+            });
+            console.log(`Call ${callId} rejected by ${rejectedBy}`);
+          }
+        }
+      } catch (err) {
+        console.error("reject_call error:", err);
+      }
+    });
+    
+    // End an active call
+    socket.on("end_call", async ({ callId, endedBy }) => {
+      try {
+        // Notify the other party that the call ended
+        const parts = callId.split("_");
+        if (parts.length >= 4) {
+          const callerId = parts[2];
+          const receiverId = parts[3];
+          
+          // Determine who the other party is
+          const otherParty = endedBy === callerId ? receiverId : callerId;
+          const otherSocketId = onlineUsers.get(otherParty);
+          
+          if (otherSocketId) {
+            io.to(otherSocketId).emit("call_ended", { 
+              callId,
+              endedBy 
+            });
+            console.log(`Call ${callId} ended by ${endedBy}`);
+          }
+        }
+      } catch (err) {
+        console.error("end_call error:", err);
+      }
+    });
+
     // Handle disconnect
     socket.on("disconnect", async (reason) => {
       console.log("WebSocket disconnected:", {
