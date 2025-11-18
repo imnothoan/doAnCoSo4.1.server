@@ -4,6 +4,15 @@ Backend server for ConnectSphere (UniVini-like) app built with Express.js and Su
 
 ## ✨ Latest Updates
 
+### 🔐 Authentication Security Update (CRITICAL)
+- 🔒 **Password Hashing**: Secure bcrypt password hashing implemented
+- ✅ **Password Validation**: Login now validates passwords correctly
+- 🛡️ **Security Fixes**: Fixed critical vulnerability where any password was accepted
+- 🔑 **Minimum Length**: 6-character minimum password requirement
+
+**See detailed documentation:**
+- 📖 [Authentication Update Guide](SERVER_AUTH_UPDATE.md) - **Deploy this update immediately!**
+
 ### Stripe Payment Integration 💳
 - 💰 **Real Payment Processing**: Integrated Stripe for secure payment handling
 - 🔒 **Server-Side Verification**: All payments verified server-side for security
@@ -42,6 +51,7 @@ Backend server for ConnectSphere (UniVini-like) app built with Express.js and Su
 - **Node.js** (>= 18.0.0)
 - **Express.js**: Web framework
 - **Supabase**: PostgreSQL database and authentication
+- **bcryptjs**: Secure password hashing
 - **Stripe**: Payment processing for Pro subscriptions
 - **Multer**: File upload handling
 - **Morgan**: HTTP request logger
