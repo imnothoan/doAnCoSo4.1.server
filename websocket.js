@@ -387,7 +387,55 @@ function initializeWebSocket(httpServer, allowedOrigins) {
         console.error("end_call error:", err);
       }
     });
+   
+socket.on("upgrade_to_video", async ({ callId }) => {
+  try {
+    // Notify the other party about the upgrade request
+    const parts = callId.split("_");
+    if (parts.length >= 4) {
+      const callerId = parts[2];
+      const receiverId = parts[3];
+      
+      // Determine who the other party is based on current user
+      const otherParty = currentUsername === callerId ? receiverId : callerId;
+      const otherSocketId = onlineUsers.get(otherParty);
+      
+      if (otherSocketId) {
+        io.to(otherSocketId).emit("upgrade_to_video", { 
+          callId 
+        });
+        console.log(`Call ${callId} upgraded to video by ${currentUsername}`);
+      }
+    }
+  } catch (err) {
+    console.error("upgrade_to_video error:", err);
+  }
+});
 
+// Handle video upgrade accepted
+socket.on("video_upgrade_accepted", async ({ callId }) => {
+  try {
+    // Notify the requester that upgrade was accepted
+    const parts = callId.split("_");
+    if (parts.length >= 4) {
+      const callerId = parts[2];
+      const receiverId = parts[3];
+      
+      // Determine who the other party is
+      const otherParty = currentUsername === callerId ? receiverId : callerId;
+      const otherSocketId = onlineUsers.get(otherParty);
+      
+      if (otherSocketId) {
+        io.to(otherSocketId).emit("video_upgrade_accepted", { 
+          callId 
+        });
+        console.log(`Video upgrade accepted for call ${callId}`);
+      }
+    }
+  } catch (err) {
+    console.error("video_upgrade_accepted error:", err);
+  }
+});
     // Handle disconnect
     socket.on("disconnect", async (reason) => {
       console.log("WebSocket disconnected:", {
