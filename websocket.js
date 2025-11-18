@@ -436,6 +436,31 @@ socket.on("video_upgrade_accepted", async ({ callId }) => {
     console.error("video_upgrade_accepted error:", err);
   }
 });
+
+// Handle call timeout (when caller doesn't answer after ringtone)
+socket.on("call_timeout", async ({ callId }) => {
+  try {
+    // Notify the other party that the call timed out
+    const parts = callId.split("_");
+    if (parts.length >= 4) {
+      const callerId = parts[2];
+      const receiverId = parts[3];
+      
+      // Determine who the other party is (opposite of current user)
+      const otherParty = currentUsername === callerId ? receiverId : callerId;
+      const otherSocketId = onlineUsers.get(otherParty);
+      
+      if (otherSocketId) {
+        io.to(otherSocketId).emit("call_timeout", { 
+          callId 
+        });
+        console.log(`Call ${callId} timed out`);
+      }
+    }
+  } catch (err) {
+    console.error("call_timeout error:", err);
+  }
+});
     // Handle disconnect
     socket.on("disconnect", async (reason) => {
       console.log("WebSocket disconnected:", {
