@@ -1004,7 +1004,131 @@ GET /payments/history?username=johndoe
 
 ---
 
+## Follow & Connection Endpoints
+
+### Check Mutual Follow Status
+
+Check if two users mutually follow each other (required for voice/video calling).
+
+```http
+GET /users/:username/mutual-follow/:otherUsername
+```
+
+**Example:**
+```http
+GET /users/johndoe/mutual-follow/janedoe
+```
+
+**Response:**
+```json
+{
+  "isMutualFollow": true,
+  "user1FollowsUser2": true,
+  "user2FollowsUser1": true
+}
+```
+
+**Use Case:**
+- Client uses this to show/hide voice/video call buttons
+- Only users who mutually follow each other can initiate calls
+- Server validates mutual follow before allowing calls
+
+---
+
+## Post Endpoints
+
+### Get Posts Feed
+
+Get a feed of posts with author information.
+
+```http
+GET /posts?limit=20&before=2025-01-15T12:00:00Z
+```
+
+**Query Parameters:**
+- `limit` (optional) - Number of posts to return (default: 20, max: 100)
+- `before` (optional) - ISO timestamp for cursor-based pagination
+
+**Response:**
+```json
+[
+  {
+    "id": 123,
+    "author_username": "johndoe",
+    "authorAvatar": "https://example.com/avatar.jpg",
+    "authorDisplayName": "John Doe",
+    "content": "Hello world!",
+    "status": "published",
+    "audience": "public",
+    "disable_comments": false,
+    "hide_like_count": false,
+    "like_count": 42,
+    "comment_count": 5,
+    "community_id": null,
+    "created_at": "2025-01-15T12:00:00Z",
+    "updated_at": "2025-01-15T12:00:00Z",
+    "post_media": [
+      {
+        "id": 1,
+        "post_id": 123,
+        "media_url": "https://example.com/image.jpg",
+        "media_type": "image",
+        "position": 0
+      }
+    ]
+  }
+]
+```
+
+### Get Post by ID
+
+Get a single post with author information and like status.
+
+```http
+GET /posts/:id?viewer=username
+```
+
+**Example:**
+```http
+GET /posts/123?viewer=johndoe
+```
+
+**Response:**
+```json
+{
+  "id": 123,
+  "author_username": "janedoe",
+  "authorAvatar": "https://example.com/avatar.jpg",
+  "authorDisplayName": "Jane Doe",
+  "content": "Beautiful sunset today!",
+  "status": "published",
+  "like_count": 15,
+  "comment_count": 3,
+  "created_at": "2025-01-15T18:30:00Z",
+  "isLikedByViewer": true,
+  "post_media": [],
+  "community_id": null
+}
+```
+
+---
+
 ## WebSocket Events
+
+### Connection
+
+Connect to WebSocket server with authentication:
+
+```javascript
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3000', {
+  auth: {
+    token: userAuthToken, // Base64 encoded userId:timestamp
+  },
+  transports: ['websocket', 'polling']
+});
+```
 
 ### Message Events
 
@@ -1014,6 +1138,7 @@ GET /payments/history?username=johndoe
 - `leave_conversation` - Leave a conversation room (data: conversationId)
 - `typing` - Typing indicator (data: conversationId, username, isTyping)
 - `mark_read` - Mark messages as read (data: conversationId, username, upToMessageId)
+- `heartbeat_ack` - Acknowledge server heartbeat (sent automatically every 25s)
 
 **Server Emits:**
 - `message_sent` - Confirmation to sender that message was saved (to sender only)
@@ -1021,7 +1146,137 @@ GET /payments/history?username=johndoe
 - `typing` - Someone is typing (broadcast to others in room)
 - `messages_read` - Messages marked as read (broadcast to room)
 - `user_status` - User online/offline status changed (broadcast to all)
+- `heartbeat` - Server heartbeat (every 30s)
 - `error` - Error message (to specific client)
+
+### Voice/Video Calling Events
+
+**Client Sends:**
+
+1. **Initiate Call**
+```javascript
+socket.emit('initiate_call', {
+  callId: 'call_1234567890_johndoe_janedoe',
+  callerId: 'johndoe',
+  callerName: 'John Doe',
+  callerAvatar: 'https://example.com/avatar.jpg',
+  receiverId: 'janedoe',
+  callType: 'video', // or 'voice'
+  timestamp: '2025-01-15T12:00:00Z'
+});
+```
+
+2. **Accept Call**
+```javascript
+socket.emit('accept_call', {
+  callId: 'call_1234567890_johndoe_janedoe',
+  acceptedBy: 'janedoe'
+});
+```
+
+3. **Reject Call**
+```javascript
+socket.emit('reject_call', {
+  callId: 'call_1234567890_johndoe_janedoe',
+  rejectedBy: 'janedoe'
+});
+```
+
+4. **End Call**
+```javascript
+socket.emit('end_call', {
+  callId: 'call_1234567890_johndoe_janedoe',
+  endedBy: 'johndoe' // or 'janedoe'
+});
+```
+
+**Server Emits:**
+
+1. **Incoming Call** (to receiver)
+```javascript
+socket.on('incoming_call', (callData) => {
+  // Show incoming call modal
+  // callData: { callId, callerId, callerName, callerAvatar, receiverId, callType, timestamp }
+});
+```
+
+2. **Call Accepted** (to caller)
+```javascript
+socket.on('call_accepted', (data) => {
+  // Start call connection
+  // data: { callId, acceptedBy }
+});
+```
+
+3. **Call Rejected** (to caller)
+```javascript
+socket.on('call_rejected', (data) => {
+  // Show rejection message
+  // data: { callId, rejectedBy }
+});
+```
+
+4. **Call Ended** (to other party)
+```javascript
+socket.on('call_ended', (data) => {
+  // End call and return to previous screen
+  // data: { callId, endedBy }
+});
+```
+
+**Calling Security & Rules:**
+
+- **Mutual Follow Required**: Both users must follow each other to initiate calls
+- Server validates mutual follow before forwarding call
+- Only online users can receive calls
+- If receiver is offline, caller receives error
+- CallId format: `call_{timestamp}_{callerId}_{receiverId}`
+
+**Error Codes:**
+
+```javascript
+socket.on('error', (error) => {
+  // error.code can be:
+  // - 'NOT_MUTUAL_FOLLOW': Users don't mutually follow each other
+  // - 'USER_OFFLINE': Receiver is not online
+  // error.message contains human-readable description
+});
+```
+
+**Example Call Flow:**
+
+```javascript
+// 1. Client checks mutual follow (optional but recommended for UX)
+const { isMutualFollow } = await api.get('/users/johndoe/mutual-follow/janedoe');
+if (!isMutualFollow) {
+  // Show "You must be mutual friends to call"
+  return;
+}
+
+// 2. Initiate call
+socket.emit('initiate_call', callData);
+
+// 3. Receiver gets incoming_call event
+socket.on('incoming_call', (callData) => {
+  showIncomingCallModal(callData);
+});
+
+// 4. Receiver accepts
+socket.emit('accept_call', { callId, acceptedBy: 'janedoe' });
+
+// 5. Caller gets call_accepted event
+socket.on('call_accepted', (data) => {
+  startWebRTCConnection(); // Start actual audio/video connection
+});
+
+// 6. Either party ends call
+socket.emit('end_call', { callId, endedBy: currentUsername });
+
+// 7. Other party gets call_ended event
+socket.on('call_ended', (data) => {
+  closeCallScreen();
+});
+```
 
 ---
 
@@ -1037,3 +1292,7 @@ GET /payments/history?username=johndoe
 8. **Payment system is for testing only** - no real money is charged
 9. Subscriptions are monthly and do not auto-renew
 10. Conversation endpoint now includes `other_participant` field for DM conversations with name and avatar
+11. **Voice/Video calling requires mutual follow** - both users must follow each other
+12. **Post endpoints include author info** - `authorAvatar` and `authorDisplayName` for display
+13. **Call IDs must be unique** - Use format `call_{timestamp}_{callerId}_{receiverId}`
+14. **WebRTC not included** - Server only handles signaling, actual media connection via WebRTC (client-side)
