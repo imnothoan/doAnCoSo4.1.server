@@ -461,6 +461,81 @@ socket.on("call_timeout", async ({ callId }) => {
     console.error("call_timeout error:", err);
   }
 });
+// ==================== WebRTC Signaling Events ====================
+
+// Handle WebRTC offer
+socket.on("webrtc_offer", async ({ callId, offer }) => {
+  try {
+    console.log(`[WebRTC] Received offer for call ${callId}`);
+    const parts = callId.split("_");
+    if (parts.length >= 4) {
+      const callerId = parts[2];
+      const receiverId = parts[3];
+      
+      // Forward offer to the receiver
+      const receiverSocketId = onlineUsers.get(receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("webrtc_offer", {
+          callId,
+          offer,
+        });
+        console.log(`[WebRTC] Forwarded offer to ${receiverId}`);
+      }
+    }
+  } catch (err) {
+    console.error("webrtc_offer error:", err);
+  }
+});
+
+// Handle WebRTC answer
+socket.on("webrtc_answer", async ({ callId, answer }) => {
+  try {
+    console.log(`[WebRTC] Received answer for call ${callId}`);
+    const parts = callId.split("_");
+    if (parts.length >= 4) {
+      const callerId = parts[2];
+      const receiverId = parts[3];
+      
+      // Forward answer to the caller
+      const callerSocketId = onlineUsers.get(callerId);
+      if (callerSocketId) {
+        io.to(callerSocketId).emit("webrtc_answer", {
+          callId,
+          answer,
+        });
+        console.log(`[WebRTC] Forwarded answer to ${callerId}`);
+      }
+    }
+  } catch (err) {
+    console.error("webrtc_answer error:", err);
+  }
+});
+
+// Handle WebRTC ICE candidate
+socket.on("webrtc_ice_candidate", async ({ callId, candidate }) => {
+  try {
+    console.log(`[WebRTC] Received ICE candidate for call ${callId}`);
+    const parts = callId.split("_");
+    if (parts.length >= 4) {
+      const callerId = parts[2];
+      const receiverId = parts[3];
+      
+      // Determine who the other party is and forward the candidate
+      const otherParty = currentUsername === callerId ? receiverId : callerId;
+      const otherSocketId = onlineUsers.get(otherParty);
+      
+      if (otherSocketId) {
+        io.to(otherSocketId).emit("webrtc_ice_candidate", {
+          callId,
+          candidate,
+        });
+        console.log(`[WebRTC] Forwarded ICE candidate to ${otherParty}`);
+      }
+    }
+  } catch (err) {
+    console.error("webrtc_ice_candidate error:", err);
+  }
+});
     // Handle disconnect
     socket.on("disconnect", async (reason) => {
       console.log("WebSocket disconnected:", {
