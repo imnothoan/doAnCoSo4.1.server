@@ -35,10 +35,21 @@ Backend server for ConnectSphere (UniVini-like) app built with Express.js and Su
 - 📖 [Vietnamese Guide (Tiếng Việt)](HUONG_DAN_TRIEN_KHAI.md)
 - 📖 [Implementation Summary](IMPLEMENTATION_SUMMARY.md)
 
+### 📞 Video/Voice Calling (Daily.co Integration)
+- ☎️ **Real-time Calling**: Voice and video calls using Daily.co
+- 🔔 **Call Signaling**: WebSocket-based call notifications and management
+- ⏱️ **Timeout Handling**: Auto-reject calls after timeout
+- 📹 **Video Upgrade**: Upgrade voice calls to video during conversation
+- 🌐 **Expo Go Compatible**: Works with Daily.co in-app browser (no native WebRTC needed)
+
+**See detailed documentation:**
+- 📖 [Server-Client Sync Complete](SERVER_CLIENT_SYNC_COMPLETE.md)
+
 ## Features
 
 - **User Management**: Complete profile system with languages, countries, interests, and background images
 - **Payment System**: Stripe integration for Pro subscriptions with test and live modes
+- **Voice/Video Calling**: Real-time calling with Daily.co integration (voice and video calls, call timeout, upgrade to video)
 - **Events System**: Create, manage, and participate in events
 - **Hangouts**: Connect with nearby online users based on activities and interests (Tinder-style)
 - **Communities**: Discussion groups with posts, likes, and comments
@@ -50,6 +61,7 @@ Backend server for ConnectSphere (UniVini-like) app built with Express.js and Su
 
 - **Node.js** (>= 18.0.0)
 - **Express.js**: Web framework
+- **Socket.IO**: Real-time WebSocket communication for messaging and calling
 - **Supabase**: PostgreSQL database and authentication
 - **bcryptjs**: Secure password hashing
 - **Stripe**: Payment processing for Pro subscriptions
