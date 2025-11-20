@@ -193,7 +193,6 @@ router.get("/", async (req, res) => {
     let query = supabase
       .from("communities")
       .select("*")
-      .eq("is_private", false)
       .order("member_count", { ascending: false })
       .limit(limit);
 
@@ -222,7 +221,6 @@ router.get("/suggested", async (req, res) => {
     const { data, error } = await supabase
       .from("communities")
       .select("*")
-      .eq("is_private", false)
       .order("member_count", { ascending: false })
       .limit(limit);
 
@@ -359,6 +357,30 @@ router.post("/:id/join", async (req, res) => {
     if (error) throw error;
 
     await recomputeCommunityMemberCount(communityId);
+
+    // Auto-add member to community chat conversation
+    try {
+      // Get or create community conversation
+      const { data: conv, error: convErr } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("community_id", communityId)
+        .single();
+
+      if (conv && conv.id) {
+        // Add member to conversation
+        await supabase
+          .from("conversation_members")
+          .upsert(
+            [{ conversation_id: conv.id, username }],
+            { onConflict: "conversation_id,username" }
+          );
+        console.log(`Auto-added ${username} to community ${communityId} chat`);
+      }
+    } catch (chatErr) {
+      console.error("Error adding member to community chat:", chatErr);
+      // Don't fail the join operation if chat addition fails
+    }
 
     res.json(data);
   } catch (err) {
@@ -559,10 +581,24 @@ router.get("/:id/posts", async (req, res) => {
   const communityId = Number(req.params.id);
   const limit = Math.min(Number(req.query.limit || 20), 100);
   const before = req.query.before ? new Date(req.query.before).toISOString() : null;
+  const viewer = (req.query.viewer || "").trim();
 
   try {
     const community = await getCommunityById(communityId);
     if (!community) return res.status(404).json({ message: "Community not found." });
+
+    // Check membership for private communities
+    if (community.is_private) {
+      if (!viewer) {
+        return res.status(403).json({ message: "Must be logged in to view private community posts." });
+      }
+      
+      const isMember = await isCommunityMember(communityId, viewer);
+      if (!isMember) {
+        // Return empty array instead of error so UI can still show community info
+        return res.json([]);
+      }
+    }
 
     let query = supabase
       .from("posts")
@@ -1376,6 +1412,28 @@ router.post("/:id/join-requests/:requestId", async (req, res) => {
         }]);
 
       await recomputeCommunityMemberCount(communityId);
+
+      // Auto-add member to community chat conversation
+      try {
+        const { data: conv, error: convErr } = await supabase
+          .from("conversations")
+          .select("id")
+          .eq("community_id", communityId)
+          .single();
+
+        if (conv && conv.id) {
+          await supabase
+            .from("conversation_members")
+            .upsert(
+              [{ conversation_id: conv.id, username: request.username }],
+              { onConflict: "conversation_id,username" }
+            );
+          console.log(`Auto-added ${request.username} to community ${communityId} chat (via join request approval)`);
+        }
+      } catch (chatErr) {
+        console.error("Error adding member to community chat:", chatErr);
+        // Don't fail the approval if chat addition fails
+      }
     }
 
     res.json({ message: `Request ${newStatus}.` });
