@@ -261,206 +261,141 @@ function initializeWebSocket(httpServer, allowedOrigins) {
       }
     });
 
-    // ==================== Voice/Video Calling Events ====================
+    // ==================== Community Chat Events ====================
     
-    // Initiate a call (voice or video)
-    socket.on("initiate_call", async (callData) => {
+    // Join a community chat room
+    socket.on("join_community_chat", async ({ communityId }) => {
       try {
-        const { callerId, receiverId, callType, callId } = callData;
+        const roomName = `community_chat_${communityId}`;
+        socket.join(roomName);
+        console.log(`Socket ${socket.id} (${currentUsername}) joined community chat ${communityId}`);
         
-        // Verify both users are mutual follows (both follow each other)
-        const { data: follows, error: followError } = await supabase
-          .from("user_follows")
-          .select("follower_username, followee_username")
-          .or(`and(follower_username.eq.${callerId},followee_username.eq.${receiverId}),and(follower_username.eq.${receiverId},followee_username.eq.${callerId})`);
-        
-        if (followError) {
-          console.error("Error checking follow status:", followError);
-          socket.emit("error", { message: "Failed to verify follow status" });
-          return;
-        }
-        
-        // Check if both users follow each other (mutual follow)
-        const callerFollowsReceiver = follows?.some(
-          f => f.follower_username === callerId && f.followee_username === receiverId
-        );
-        const receiverFollowsCaller = follows?.some(
-          f => f.follower_username === receiverId && f.followee_username === callerId
-        );
-        
-        if (!callerFollowsReceiver || !receiverFollowsCaller) {
-          socket.emit("error", { 
-            message: "Can only call users who mutually follow you",
-            code: "NOT_MUTUAL_FOLLOW"
+        // Notify others that user joined
+        if (currentUsername) {
+          socket.to(roomName).emit("user_joined_community_chat", {
+            communityId,
+            username: currentUsername,
           });
+        }
+      } catch (err) {
+        console.error("join_community_chat error:", err);
+      }
+    });
+    
+    // Leave a community chat room
+    socket.on("leave_community_chat", ({ communityId }) => {
+      const roomName = `community_chat_${communityId}`;
+      socket.leave(roomName);
+      console.log(`Socket ${socket.id} left community chat ${communityId}`);
+      
+      // Notify others that user left
+      if (currentUsername) {
+        socket.to(roomName).emit("user_left_community_chat", {
+          communityId,
+          username: currentUsername,
+        });
+      }
+    });
+    
+    // Send a message in community chat
+    socket.on("send_community_message", async ({ communityId, senderUsername, content }) => {
+      try {
+        // 1. Verify user is member of community
+        const { data: membership } = await supabase
+          .from("community_members")
+          .select("username")
+          .eq("community_id", communityId)
+          .eq("username", senderUsername)
+          .limit(1);
+        
+        if (!membership || membership.length === 0) {
+          socket.emit("error", { message: "Not a member of this community" });
           return;
         }
         
-        // Find receiver's socket
-        const receiverSocketId = onlineUsers.get(receiverId);
-        if (!receiverSocketId) {
-          socket.emit("error", { 
-            message: "User is not online",
-            code: "USER_OFFLINE"
-          });
+        // 2. Get or create community conversation
+        let conversationId;
+        const { data: existingConv } = await supabase
+          .from("conversations")
+          .select("id")
+          .eq("community_id", communityId)
+          .single();
+        
+        if (existingConv) {
+          conversationId = existingConv.id;
+        } else {
+          // Create conversation for this community
+          const { data: newConv, error: convErr } = await supabase
+            .from("conversations")
+            .insert([{
+              type: "community",
+              community_id: communityId,
+              created_by: senderUsername,
+            }])
+            .select("id")
+            .single();
+          
+          if (convErr) throw convErr;
+          conversationId = newConv.id;
+        }
+        
+        // 3. Insert message
+        const { data: message, error } = await supabase
+          .from("messages")
+          .insert([{
+            conversation_id: conversationId,
+            sender_username: senderUsername,
+            message_type: "text",
+            content,
+          }])
+          .select(`
+            id,
+            conversation_id,
+            sender_username,
+            message_type,
+            content,
+            created_at,
+            sender:users!messages_sender_username_fkey(id, username, name, avatar, email, country, city, status, bio, age, gender, interests, is_online)
+          `)
+          .single();
+        
+        if (error) {
+          console.error("Error creating community message:", error);
+          socket.emit("error", { message: "Failed to send message" });
           return;
         }
         
-        // Send incoming call to receiver
-        io.to(receiverSocketId).emit("incoming_call", callData);
-        console.log(`Call initiated from ${callerId} to ${receiverId} (${callType})`);
+        const roomName = `community_chat_${communityId}`;
         
+        // 4. Build payload
+        const messagePayload = {
+          ...message,
+          communityId,
+          chatId: conversationId,
+          senderId: message.sender_username,
+          timestamp: message.created_at,
+        };
+        
+        // 5. Emit to room
+        io.to(roomName).emit("new_community_message", messagePayload);
+        
+        console.log(`Community message sent in ${communityId} by ${senderUsername}`);
       } catch (err) {
-        console.error("initiate_call error:", err);
-        socket.emit("error", { message: "Failed to initiate call" });
+        console.error("send_community_message error:", err);
+        socket.emit("error", { message: "Server error while sending message" });
       }
     });
     
-    // Accept an incoming call
-    socket.on("accept_call", async ({ callId, acceptedBy }) => {
-      try {
-        // Notify the caller that the call was accepted
-        // We need to find the caller's socket based on the callId
-        // callId format: call_timestamp_callerId_receiverId
-        const parts = callId.split("_");
-        if (parts.length >= 4) {
-          const callerId = parts[2];
-          const callerSocketId = onlineUsers.get(callerId);
-          
-          if (callerSocketId) {
-            io.to(callerSocketId).emit("call_accepted", { 
-              callId,
-              acceptedBy 
-            });
-            console.log(`Call ${callId} accepted by ${acceptedBy}`);
-          }
-        }
-      } catch (err) {
-        console.error("accept_call error:", err);
-      }
+    // Community typing indicator
+    socket.on("community_typing", ({ communityId, username, isTyping }) => {
+      const roomName = `community_chat_${communityId}`;
+      // Broadcast to others in the room (not sender)
+      socket.to(roomName).emit("community_typing", {
+        communityId,
+        username,
+        isTyping,
+      });
     });
-    
-    // Reject an incoming call
-    socket.on("reject_call", async ({ callId, rejectedBy }) => {
-      try {
-        // Notify the caller that the call was rejected
-        const parts = callId.split("_");
-        if (parts.length >= 4) {
-          const callerId = parts[2];
-          const callerSocketId = onlineUsers.get(callerId);
-          
-          if (callerSocketId) {
-            io.to(callerSocketId).emit("call_rejected", { 
-              callId,
-              rejectedBy 
-            });
-            console.log(`Call ${callId} rejected by ${rejectedBy}`);
-          }
-        }
-      } catch (err) {
-        console.error("reject_call error:", err);
-      }
-    });
-    
-    // End an active call
-    socket.on("end_call", async ({ callId, endedBy }) => {
-      try {
-        // Notify the other party that the call ended
-        const parts = callId.split("_");
-        if (parts.length >= 4) {
-          const callerId = parts[2];
-          const receiverId = parts[3];
-          
-          // Determine who the other party is
-          const otherParty = endedBy === callerId ? receiverId : callerId;
-          const otherSocketId = onlineUsers.get(otherParty);
-          
-          if (otherSocketId) {
-            io.to(otherSocketId).emit("call_ended", { 
-              callId,
-              endedBy 
-            });
-            console.log(`Call ${callId} ended by ${endedBy}`);
-          }
-        }
-      } catch (err) {
-        console.error("end_call error:", err);
-      }
-    });
-   
-socket.on("upgrade_to_video", async ({ callId }) => {
-  try {
-    // Notify the other party about the upgrade request
-    const parts = callId.split("_");
-    if (parts.length >= 4) {
-      const callerId = parts[2];
-      const receiverId = parts[3];
-      
-      // Determine who the other party is based on current user
-      const otherParty = currentUsername === callerId ? receiverId : callerId;
-      const otherSocketId = onlineUsers.get(otherParty);
-      
-      if (otherSocketId) {
-        io.to(otherSocketId).emit("upgrade_to_video", { 
-          callId 
-        });
-        console.log(`Call ${callId} upgraded to video by ${currentUsername}`);
-      }
-    }
-  } catch (err) {
-    console.error("upgrade_to_video error:", err);
-  }
-});
-
-// Handle video upgrade accepted
-socket.on("video_upgrade_accepted", async ({ callId }) => {
-  try {
-    // Notify the requester that upgrade was accepted
-    const parts = callId.split("_");
-    if (parts.length >= 4) {
-      const callerId = parts[2];
-      const receiverId = parts[3];
-      
-      // Determine who the other party is
-      const otherParty = currentUsername === callerId ? receiverId : callerId;
-      const otherSocketId = onlineUsers.get(otherParty);
-      
-      if (otherSocketId) {
-        io.to(otherSocketId).emit("video_upgrade_accepted", { 
-          callId 
-        });
-        console.log(`Video upgrade accepted for call ${callId}`);
-      }
-    }
-  } catch (err) {
-    console.error("video_upgrade_accepted error:", err);
-  }
-});
-
-// Handle call timeout (when caller doesn't answer after ringtone)
-socket.on("call_timeout", async ({ callId }) => {
-  try {
-    // Notify the other party that the call timed out
-    const parts = callId.split("_");
-    if (parts.length >= 4) {
-      const callerId = parts[2];
-      const receiverId = parts[3];
-      
-      // Determine who the other party is (opposite of current user)
-      const otherParty = currentUsername === callerId ? receiverId : callerId;
-      const otherSocketId = onlineUsers.get(otherParty);
-      
-      if (otherSocketId) {
-        io.to(otherSocketId).emit("call_timeout", { 
-          callId 
-        });
-        console.log(`Call ${callId} timed out`);
-      }
-    }
-  } catch (err) {
-    console.error("call_timeout error:", err);
-  }
-});
     // Handle disconnect
     socket.on("disconnect", async (reason) => {
       console.log("WebSocket disconnected:", {

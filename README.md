@@ -35,25 +35,26 @@ Backend server for ConnectSphere (UniVini-like) app built with Express.js and Su
 - 📖 [Vietnamese Guide (Tiếng Việt)](HUONG_DAN_TRIEN_KHAI.md)
 - 📖 [Implementation Summary](IMPLEMENTATION_SUMMARY.md)
 
-### 📞 Video/Voice Calling (Daily.co Integration)
-- ☎️ **Real-time Calling**: Voice and video calls using Daily.co
-- 🔔 **Call Signaling**: WebSocket-based call notifications and management
-- ⏱️ **Timeout Handling**: Auto-reject calls after timeout
-- 📹 **Video Upgrade**: Upgrade voice calls to video during conversation
-- 🌐 **Expo Go Compatible**: Works with Daily.co in-app browser (no native WebRTC needed)
-
-**See detailed documentation:**
-- 📖 [Server-Client Sync Complete](SERVER_CLIENT_SYNC_COMPLETE.md)
+### 💬 Community Chat System
+- 🏘️ **Community Chat**: Real-time chat for each community using WebSocket
+- 👥 **Member Management**: Admins can manage roles, kick members
+- 🔐 **PRO User Creation**: Only PRO users can create new communities
+- 🚪 **Private Communities**: Join request system with admin approval
+- 🖼️ **Media Support**: Upload avatar and cover images for communities
 
 ## Features
 
 - **User Management**: Complete profile system with languages, countries, interests, and background images
 - **Payment System**: Stripe integration for Pro subscriptions with test and live modes
-- **Voice/Video Calling**: Real-time calling with Daily.co integration (voice and video calls, call timeout, upgrade to video)
 - **Events System**: Create, manage, and participate in events
 - **Hangouts**: Connect with nearby online users based on activities and interests (Tinder-style)
-- **Communities**: Discussion groups with posts, likes, and comments
-- **Messaging**: Real-time conversations with media support
+- **Communities**: Discussion groups with posts, likes, comments, and real-time chat
+  - PRO user restriction for community creation
+  - Admin role management and member moderation
+  - Private communities with join request approval
+  - Avatar and cover image uploads
+  - Real-time WebSocket-based community chat
+- **Messaging**: Real-time conversations with image/media support
 - **Notifications**: Push notifications for various activities
 - **Quick Messages**: Custom shortcuts for frequently used messages
 
@@ -95,7 +96,8 @@ SUPABASE_ANON_KEY=your-anon-key
 CORS_ORIGIN=http://localhost:3000,http://localhost:19006
 POSTS_BUCKET=posts
 AVATARS_BUCKET=avatars
-MESSAGES_BUCKET=messages
+MESSAGES_BUCKET=chat-image
+COMMUNITY_BUCKET=community
 
 # Stripe Payment (get test keys from https://dashboard.stripe.com/test/apikeys)
 STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key_here
