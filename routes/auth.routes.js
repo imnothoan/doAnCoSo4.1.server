@@ -9,15 +9,20 @@ const { randomUUID } = require('crypto');
  * Body: { id, email, name, country, city, username, gender }
  */
 router.post('/signup', async (req, res) => {
+  console.log('📝 Received signup sync request:', req.body);
   const { id, name, email, country, city, username: customUsername, gender } = req.body;
 
   // We expect an ID from Supabase Auth
-  if (!id || !email) return res.status(400).json({ message: 'Missing id or email' });
+  if (!id || !email) {
+    console.error('❌ Missing id or email in signup request');
+    return res.status(400).json({ message: 'Missing id or email' });
+  }
 
   try {
     // Check if username exists (if provided)
     // If not provided, generate one
     const username = customUsername || (email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '') + '_' + Math.floor(Math.random() * 1000));
+    console.log('👤 Processing signup for username:', username);
 
     // Insert into public users table
     const { data: inserted, error: insErr } = await supabase
@@ -36,10 +41,13 @@ router.post('/signup', async (req, res) => {
       .single();
 
     if (insErr) {
+      console.error('❌ Error inserting user into public table:', insErr);
       // If duplicate username, we might want to retry with a new username if it was auto-generated
       // But for now just throw
       throw insErr;
     }
+
+    console.log('✅ User inserted into public table:', inserted.id);
 
     // Create default hangout status for new user (visible by default)
     try {
@@ -63,8 +71,8 @@ router.post('/signup', async (req, res) => {
       // No token needed here as client already has it from Supabase
     });
   } catch (err) {
-    console.error('Signup error:', err);
-    res.status(500).json({ message: 'Server error during signup sync' });
+    console.error('❌ Signup sync error:', err);
+    res.status(500).json({ message: 'Server error during signup sync', error: err.message });
   }
 });
 
