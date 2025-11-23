@@ -164,13 +164,23 @@ router.post("/", requireAuth, async (req, res) => {
 
     // Create a conversation for community chat
     try {
-      await supabase
+      const { data: convData, error: convErr } = await supabase
         .from("conversations")
         .insert([{
           type: "community",
           community_id: data.id,
           created_by: created_by,
-        }]);
+        }])
+        .select("id")
+        .single();
+
+      if (convErr) throw convErr;
+
+      if (convData && convData.id) {
+        await supabase
+          .from("conversation_members")
+          .insert([{ conversation_id: convData.id, username: created_by, role: "admin" }]);
+      }
     } catch (convErr) {
       console.error("Error creating community conversation:", convErr);
       // Don't fail the whole operation if conversation creation fails
@@ -367,17 +377,25 @@ router.post("/:id/join", requireAuth, async (req, res) => {
           .from("conversations")
           .select("id")
           .eq("community_id", communityId)
+          .eq("type", "community")
           .single();
 
         if (conv && conv.id) {
-          // Add member to conversation
-          await supabase
+          // Add member to conversation_members
+          const { error: memberErr } = await supabase
             .from("conversation_members")
             .upsert(
-              [{ conversation_id: conv.id, username }],
+              [{ conversation_id: conv.id, username, role: "member" }],
               { onConflict: "conversation_id,username" }
             );
-          console.log(`Auto-added ${username} to community ${communityId} chat`);
+
+          if (memberErr) {
+            console.error(`Error adding ${username} to community chat ${conv.id}:`, memberErr);
+          } else {
+            console.log(`✅ Auto-added ${username} to community ${communityId} chat (conversation ${conv.id})`);
+          }
+        } else {
+          console.warn(`⚠️ No conversation found for community ${communityId}`);
         }
       } catch (chatErr) {
         console.error("Error adding member to community chat:", chatErr);
@@ -400,6 +418,12 @@ router.delete("/:id/join", requireAuth, async (req, res) => {
   const username = req.user.username;
 
   try {
+    const community = await getCommunityById(communityId);
+    if (!community) return res.status(404).json({ message: "Community not found." });
+    if (community.created_by === username) {
+      return res.status(403).json({ message: "Owner cannot leave community. Delete it instead." });
+    }
+
     const { error } = await supabase
       .from("community_members")
       .delete()
@@ -473,7 +497,7 @@ router.get("/:id/join_requests", requireAuth, async (req, res) => {
 
     const { data: requests, error } = await supabase
       .from("community_members")
-      .select("username, created_at") // created_at is joined_at
+      .select("username, joined_at") // created_at is joined_at
       .eq("community_id", communityId)
       .eq("status", "pending")
       .order("joined_at", { ascending: false });
@@ -1807,9 +1831,17 @@ router.get("/:id/chat/messages", requireAuth, async (req, res) => {
   const limit = Math.min(Number(req.query.limit || 50), 100);
 
   try {
-    // Check if user is member
+    // Get community to check creator
+    const community = await getCommunityById(communityId);
+    if (!community) {
+      return res.status(404).json({ message: "Community not found." });
+    }
+
+    // Allow creator OR approved members
+    const isCreator = community.created_by === viewer;
     const isMember = await isCommunityMember(communityId, viewer);
-    if (!isMember) {
+
+    if (!isCreator && !isMember) {
       console.log(`User ${viewer} is not a member of community ${communityId} (or not approved)`);
       return res.status(403).json({ message: "Must be a member to view chat." });
     }
