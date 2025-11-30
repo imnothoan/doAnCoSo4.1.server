@@ -243,11 +243,24 @@ router.get("/:id", optionalAuth, async (req, res) => {
     if (!community) return res.status(404).json({ message: "Community not found." });
 
     let isMember = false;
+    let membershipStatus = null; // null = not a member, 'pending' = waiting approval, 'approved' = member
+    
     if (viewer) {
-      isMember = await isCommunityMember(communityId, viewer);
+      // Check membership status including pending
+      const { data: memberData, error: memberError } = await supabase
+        .from("community_members")
+        .select("status, role")
+        .eq("community_id", communityId)
+        .eq("username", viewer)
+        .limit(1);
+
+      if (!memberError && memberData && memberData.length > 0) {
+        membershipStatus = memberData[0].status;
+        isMember = memberData[0].status === 'approved';
+      }
     }
 
-    res.json({ ...community, is_member: isMember });
+    res.json({ ...community, is_member: isMember, membership_status: membershipStatus });
   } catch (err) {
     console.error("get community error:", err);
     res.status(500).json({ message: "Server error while fetching community." });
