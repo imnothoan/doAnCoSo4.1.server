@@ -9,16 +9,35 @@ const upload = multer({ storage: multer.memoryStorage() });
 /*                                   HELPERS                                  */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Calculate great-circle distance between two points using Haversine formula
+ * This calculates the straight-line distance (đường chim bay / as the crow flies)
+ * Uses WGS84 ellipsoid radius for improved accuracy
+ * @param {number} lat1 - Latitude of first point
+ * @param {number} lon1 - Longitude of first point
+ * @param {number} lat2 - Latitude of second point
+ * @param {number} lon2 - Longitude of second point
+ * @returns {number} Distance in kilometers
+ */
 function calculateDistance(lat1, lon1, lat2, lon2) {
-   const R = 6371;
+   // WGS84 Earth radius in km (more accurate than simple 6371)
+   // This is the mean radius used by GPS systems
+   const R = 6371.0088;
+   
    const dLat = ((lat2 - lat1) * Math.PI) / 180;
    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+   
+   const lat1Rad = (lat1 * Math.PI) / 180;
+   const lat2Rad = (lat2 * Math.PI) / 180;
 
+   // Haversine formula for great-circle distance
    const a =
       Math.sin(dLat / 2) ** 2 +
-      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+      Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLon / 2) ** 2;
 
-   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+   
+   return R * c;
 }
 
 async function getEventById(id) {
