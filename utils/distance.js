@@ -1,6 +1,6 @@
 /**
  * Calculate great-circle distance between two points using Haversine formula
- * This calculates the straight-line distance (đường chim bay / as the crow flies)
+ * This calculates the straight-line distance (as the crow flies)
  * 
  * Uses a mean Earth radius of 6371.0088 km, which is commonly used for geodetic
  * calculations and provides good accuracy for most applications. Note that this
