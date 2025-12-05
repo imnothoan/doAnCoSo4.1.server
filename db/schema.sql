@@ -466,7 +466,8 @@ SELECT
   cm.username,
   MAX(m.created_at) as last_message_at,
   COUNT(m.id) FILTER (
-    WHERE NOT EXISTS (
+    WHERE m.sender_username != cm.username
+    AND NOT EXISTS (
       SELECT 1 FROM message_reads mr 
       WHERE mr.message_id = m.id 
       AND mr.username = cm.username
