@@ -4,7 +4,16 @@ Backend server for ConnectSphere (UniVini-like) app built with Express.js and Su
 
 ## ✨ Latest Updates
 
-### 🔄 Server-Client Synchronization (November 2024) - LATEST
+### 💬 Unread Messages Fix (December 2024) - LATEST
+- ✅ **Accurate Unread Counts**: Fixed issue where users saw their own messages as "unread"
+- 🎯 **Client-Server Sync**: Server now correctly excludes sender's messages from unread count
+- 🔧 **Minimal Changes**: Two surgical fixes in database view and fallback query
+- 🛡️ **Security Verified**: Zero vulnerabilities detected by CodeQL scan
+
+**See detailed documentation:**
+- 📖 [Unread Messages Fix Summary](UNREAD_MESSAGES_FIX_SUMMARY.md) - **Complete implementation details**
+
+### 🔄 Server-Client Synchronization (November 2024)
 - 🔍 **Private Community Discovery**: Private communities now visible in search and suggestions
 - 🔒 **Post Access Control**: Non-members can't see private community posts
 - 💬 **Auto-Join Chat**: Members automatically join community chat on join/approval
